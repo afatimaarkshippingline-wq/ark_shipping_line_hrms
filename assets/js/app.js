@@ -116,6 +116,20 @@ const app = createApp({
         async function fetchDailyQuote(forceFresh = false) {
             dailyQuote.loading = true;
             try {
+                const res = await fetch('https://api.quotable.io/random?_=' + Date.now());
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data && data.content) {
+                        dailyQuote.text = data.content;
+                        dailyQuote.author = data.author || 'Inspirational';
+                        dailyQuote.category = data.tags && data.tags[0] ? data.tags[0].toUpperCase() : 'Daily Wisdom';
+                        dailyQuote.loading = false;
+                        return;
+                    }
+                }
+            } catch (e) {}
+
+            try {
                 const res = await fetch('https://dummyjson.com/quotes/random?_=' + Date.now());
                 if (res.ok) {
                     const data = await res.json();
@@ -128,6 +142,7 @@ const app = createApp({
                     }
                 }
             } catch (e) {}
+
             const picked = FALLBACK_QUOTES[Math.floor(Math.random() * FALLBACK_QUOTES.length)];
             dailyQuote.text = picked.text;
             dailyQuote.author = picked.author;
@@ -1443,17 +1458,7 @@ const app = createApp({
             }, 300);
         }
 
-        function exportAttendanceCSV() {
-            let csv = "Name,ID,Action,Time,Date,Net Hours,Break Deducted,Audit Note,Punctuality\n";
-            timesheets.value.forEach(t => { csv += `"${t.empName}","${t.empId}","${t.action}","${t.time}","${t.date}","${t.totalHours}","${t.breakDeducted || ''}","${t.auditNote || ''}","${t.punctuality}"\n`; });
-            downloadCSVFile(csv, "ARK_Timesheet.csv");
-        }
 
-        function exportFullDataCSV() {
-            let csv = "ID,Name,Email,Dept,Role,Status,Joined\n";
-            employees.value.forEach(e => { csv += `"${e.id}","${e.name}","${e.email}","${e.dept}","${e.role || ''}","${e.status}","${e.joined || ''}"\n`; });
-            downloadCSVFile(csv, "ARK_Roster.csv");
-        }
 
         // ── Enterprise PDF Reports ─────────────────────────────────────────────
         const reportMonth = ref((() => { const d = new Date(); return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`; })());
@@ -2035,14 +2040,7 @@ const app = createApp({
             });
         });
 
-        function downloadCSVFile(content, fileName) {
-            const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement("a");
-            link.setAttribute("href", URL.createObjectURL(blob));
-            link.setAttribute("download", fileName);
-            document.body.appendChild(link); link.click(); document.body.removeChild(link);
-            showToast('CSV exported!', 'success');
-        }
+
 
         async function saveSupabaseCredentials() {
             const url = String(supabaseUrl.value || '').trim();
@@ -2183,7 +2181,7 @@ const app = createApp({
             openAddDepartmentModal, saveDepartmentSubmit, adminFinalDecide, managerDecideLeave,
             openApplyLeaveModal, submitApplyLeave, empPunchAction, isPunchDisabled,
             exportAttendancePDF, exportLeavesPDF, exportRosterPDF, exportEmployeeDossierPDF,
-            exportAttendanceCSV, exportFullDataCSV, clearNotifications,
+            clearNotifications,
             getBadgeClasses, formatDateNice, getLeaveAuditBadge, isManager, getEmployeeManager, getEmployeeManagerName,
             canAdminDecideLeave, formatSecondsHms, formatSecondsPretty, pad2
         };

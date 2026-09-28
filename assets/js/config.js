@@ -5,8 +5,8 @@
 
 const CONFIG = {
     // Supabase configuration — paste your own credentials in Admin → Settings
-    DEFAULT_SUPABASE_URL: '',          // e.g. https://xyzcompany.supabase.co
-    DEFAULT_SUPABASE_ANON_KEY: '',     // e.g. eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+    DEFAULT_SUPABASE_URL: 'https://eoxe7cw0t9lf8wtyfodyw.supabase.co',          // e.g. https://xyzcompany.supabase.co
+    DEFAULT_SUPABASE_ANON_KEY: 'sb_publishable_EOXE-7Cw0T9LF8wtyFoDyw_quu-Qp0W',     // e.g. eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 
     // Legacy Google Apps Script URL (kept for reference, no longer used)
     DEFAULT_API_URL: '',
