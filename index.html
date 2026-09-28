@@ -1,0 +1,1608 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ARK HRMS · ARK Shipping Line</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: { 50:'#f0f5ff',100:'#e0ecff',200:'#c5dcfe',300:'#9bc3fe',400:'#699dfb',500:'#3b75f7',600:'#2557eb',700:'#1d42d8',800:'#1e38af',900:'#1e338a',950:'#0c1a4b' },
+                        navy: { 800:'#0d172e',850:'#091024',900:'#060b18',950:'#030712' }
+                    },
+                    fontFamily: { sans:['Plus Jakarta Sans','Inter','sans-serif'], heading:['Plus Jakarta Sans','sans-serif'] }
+                }
+            }
+        }
+    </script>
+
+    <!-- Icons & Fonts -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400;1,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Vendor Libraries (Chart.js, Vue 3 & Supabase) -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <!-- Application Stylesheet -->
+    <link rel="stylesheet" href="assets/css/style.css">
+</head>
+
+<body class="min-h-screen flex flex-col text-slate-800 dark:text-slate-100 bg-slate-50 dark:bg-navy-950 transition-colors duration-200 app-bg-glow">
+
+<div id="app" v-cloak class="min-h-screen flex flex-col">
+
+    <!-- TOAST NOTIFICATION -->
+    <div :class="['toast-dialog flex items-start gap-3 p-4 rounded-2xl bg-white/95 dark:bg-slate-900/95 border border-slate-200/90 dark:border-slate-700/80 shadow-2xl backdrop-blur-xl', { show: toast.visible }]">
+        <div :class="['w-10 h-10 rounded-xl flex items-center justify-center text-lg', toast.type === 'error' ? 'bg-rose-50 dark:bg-rose-900/30 text-rose-600' : toast.type === 'info' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600' : 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600']">
+            <i :class="toast.icon"></i>
+        </div>
+        <div class="flex-1 pr-2">
+            <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">{{ toast.title }}</h4>
+            <p class="text-sm font-semibold text-slate-800 dark:text-white mt-0.5">{{ toast.message }}</p>
+        </div>
+        <button @click="toast.visible = false" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+            <i class="fa-solid fa-xmark text-sm"></i>
+        </button>
+    </div>
+
+    <!-- LOADING OVERLAY -->
+    <div v-if="loading.visible" class="fixed inset-0 z-50 flex items-center justify-center loading-glass transition-all duration-300">
+        <div class="p-7 rounded-3xl bg-white/95 dark:bg-slate-900/95 border border-slate-200/80 dark:border-slate-700/60 shadow-2xl backdrop-blur-xl flex flex-col items-center gap-4 min-w-[240px]">
+            <!-- Dual-orbit premium spinner -->
+            <div class="orbit-spinner">
+                <div class="ring-outer"></div>
+                <div class="ring-inner"></div>
+                <span class="orbit-center">
+                    <i class="fa-solid fa-anchor text-blue-600 text-sm"></i>
+                </span>
+            </div>
+            <div class="text-center">
+                <p class="text-sm font-black text-slate-900 dark:text-white font-heading truncate max-w-[200px]">{{ loading.message }}</p>
+                <p class="text-[11px] font-semibold text-slate-400 mt-0.5">Please wait a moment…</p>
+            </div>
+            <!-- Shimmer progress track -->
+            <div class="loader-progress-track w-full">
+                <div class="loader-progress-bar"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ======================================================== -->
+    <!-- 1. LOGIN SCREEN -->
+    <!-- ======================================================== -->
+    <div v-if="!currentUser" class="flex-1 flex items-center justify-center p-4">
+        <div class="w-full max-w-md p-8 sm:p-10 rounded-3xl glass-card relative overflow-hidden">
+            <div class="absolute -top-24 -right-24 w-48 h-48 bg-blue-500/15 rounded-full blur-3xl pointer-events-none"></div>
+            <div class="absolute -bottom-24 -left-24 w-48 h-48 bg-indigo-500/15 rounded-full blur-3xl pointer-events-none"></div>
+
+            <div class="text-center mb-8 relative z-10">
+                <div class="flex items-center justify-center mb-4">
+                    <img src="assets/img/ark-logo.svg" alt="ARK Shipping Line" class="ark-logo">
+                </div>
+                <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-xs font-bold mb-2">
+                    <i class="fa-solid fa-shield-halved text-blue-500"></i> Secure Workforce Portal
+                </div>
+                <h1 class="text-2xl font-black text-slate-900 dark:text-white tracking-tight font-heading">Workforce Portal</h1>
+                <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Sign in with your Employee ID and password</p>
+            </div>
+
+            <form @submit.prevent="handleLogin" class="space-y-4 relative z-10">
+                <div>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">Employee ID</label>
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400 text-sm"><i class="fa-solid fa-id-badge"></i></span>
+                        <input type="text" v-model="loginForm.empId" required autocomplete="username" placeholder="e.g. 1 (Admin) or 101"
+                               class="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white/80 dark:bg-slate-800/80 text-slate-900 dark:text-slate-100 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">Password</label>
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400 text-sm"><i class="fa-solid fa-lock"></i></span>
+                        <input :type="loginForm.showPassword ? 'text' : 'password'" v-model="loginForm.password" required autocomplete="current-password" placeholder="admin123 or 123456"
+                               class="w-full pl-10 pr-10 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white/80 dark:bg-slate-800/80 text-slate-900 dark:text-slate-100 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all">
+                        <button type="button" @click="loginForm.showPassword = !loginForm.showPassword" class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+                            <i :class="loginForm.showPassword ? 'fa-solid fa-eye-slash text-sm' : 'fa-solid fa-eye text-sm'"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <button type="submit" :disabled="loading.visible"
+                        class="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold text-sm shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2 hover:scale-[1.01] active:scale-[0.99] transition-all disabled:opacity-50">
+                    <span>Sign In to HRMS</span>
+                    <i class="fa-solid fa-arrow-right text-xs"></i>
+                </button>
+            </form>
+
+            <!-- Quick Demo Credentials Box -->
+            <div class="mt-6 pt-5 border-t border-slate-200/80 dark:border-slate-800 text-center relative z-10">
+                <p class="text-[11px] font-bold text-slate-400 mb-2">QUICK DEMO LOGINS</p>
+                <div class="flex items-center justify-center gap-2 flex-wrap text-xs">
+                    <button type="button" @click="setDemoLogin('1', 'admin123')" class="px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 font-bold hover:underline">
+                        👑 Admin (1 / admin123)
+                    </button>
+                    <button type="button" @click="setDemoLogin('101', '123456')" class="px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-300 font-bold hover:underline">
+                        👔 Manager (101 / 123456)
+                    </button>
+                    <button type="button" @click="setDemoLogin('102', '123456')" class="px-2.5 py-1 rounded-lg bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-300 font-bold hover:underline">
+                        💼 Staff (102 / 123456)
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ======================================================== -->
+    <!-- 2. MAIN APPLICATION (AUTHENTICATED) -->
+    <!-- ======================================================== -->
+    <div v-else class="flex-1 flex flex-col min-h-screen">
+
+        <!-- TOP NAVBAR -->
+        <header class="sticky top-0 z-40 glass-header px-4 sm:px-8 py-3 flex items-center justify-between">
+            <div class="flex items-center gap-3 sm:gap-4">
+                <img src="assets/img/ark-logo.svg" alt="ARK Shipping" class="h-8 sm:h-9 w-auto object-contain cursor-pointer"
+                     @click="currentRole === 'admin' ? switchAdminNav('overview') : switchEmpTab('overview')">
+                <span class="hidden sm:inline-block h-5 w-[1px] bg-slate-300 dark:bg-slate-700"></span>
+                <span :class="['px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider', currentRole === 'admin' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300' : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300']">
+                    {{ currentRole === 'admin' ? 'Admin Portal' : 'Employee Portal' }}
+                </span>
+            </div>
+
+            <!-- Navbar Right Items -->
+            <div class="flex items-center gap-2 sm:gap-4">
+                <!-- NJ Clock Pill -->
+                <div class="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/80">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span class="text-[11px] font-bold text-slate-600 dark:text-slate-300 font-mono">NJ {{ njClock.time }}</span>
+                </div>
+
+                <!-- Notifications Bell -->
+                <div class="relative">
+                    <button @click="showNotifDropdown = !showNotifDropdown" class="w-9 h-9 rounded-xl flex items-center justify-center text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white bg-slate-100 dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700 relative">
+                        <i class="fa-regular fa-bell text-sm"></i>
+                        <span v-if="userNotifications.length > 0" class="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-rose-500"></span>
+                    </button>
+
+                    <!-- Notifications Dropdown -->
+                    <div v-if="showNotifDropdown" class="absolute right-0 mt-2 w-80 p-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-2xl z-50">
+                        <div class="flex items-center justify-between pb-2 mb-2 border-b border-slate-100 dark:border-slate-800">
+                            <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400">Activity & Alerts</h4>
+                            <button @click="clearNotifications" class="text-[11px] font-bold text-rose-500 hover:underline">Clear All</button>
+                        </div>
+                        <div class="space-y-2 max-h-64 overflow-y-auto">
+                            <p v-if="!userNotifications.length" class="text-xs text-slate-400 text-center py-6">No notifications</p>
+                            <div v-for="n in userNotifications.slice(0, 10)" :key="n.id" class="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 text-xs flex items-start gap-2.5">
+                                <span class="w-7 h-7 rounded-xl bg-blue-100 dark:bg-blue-900/40 text-blue-600 flex items-center justify-center text-xs flex-shrink-0 mt-0.5">
+                                    <i :class="['fa-solid', n.icon || 'fa-bell']"></i>
+                                </span>
+                                <div class="flex-1 min-w-0">
+                                    <p class="font-bold text-slate-800 dark:text-slate-200 leading-snug">{{ n.text }}</p>
+                                    <span class="text-[10px] text-slate-400 mt-1 block font-semibold">{{ n.time }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Theme Toggle -->
+                <button @click="toggleDarkMode" class="w-9 h-9 rounded-xl flex items-center justify-center text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white bg-slate-100 dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700" title="Toggle Theme">
+                    <i :class="['fa-solid', isDarkMode ? 'fa-sun text-amber-400 text-sm' : 'fa-moon text-slate-600 text-sm']"></i>
+                </button>
+
+                <!-- User Profile Preview -->
+                <div class="flex items-center gap-2 pl-1 sm:pl-2">
+                    <span class="w-9 h-9 rounded-xl bg-blue-100 dark:bg-blue-900/40 text-blue-600 flex items-center justify-center text-lg cursor-pointer"
+                          @click="currentRole === 'employee' ? switchEmpTab('profile') : null">
+                        {{ currentUser.avatar || '👨‍💼' }}
+                    </span>
+                    <div class="hidden lg:block leading-tight text-left">
+                        <p class="text-xs font-bold text-slate-800 dark:text-white">{{ currentUser.name }}</p>
+                        <p class="text-[10px] text-slate-400 uppercase tracking-wider">{{ currentRole === 'admin' ? 'Super Administrator' : (currentUser.designation || 'Staff') }}</p>
+                    </div>
+                </div>
+
+                <!-- Logout Button -->
+                <button @click="logout" class="p-2 sm:px-3 sm:py-1.5 rounded-xl border border-rose-200/80 dark:border-rose-900/60 bg-rose-50/50 dark:bg-rose-950/20 text-rose-600 dark:text-rose-400 text-xs font-bold flex items-center gap-1.5 hover:bg-rose-600 hover:text-white transition-colors" title="Sign Out">
+                    <i class="fa-solid fa-arrow-right-from-bracket text-xs"></i>
+                    <span class="hidden sm:inline">Sign Out</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- MAIN CONTENT AREA -->
+        <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+
+            <!-- ======================================================== -->
+            <!-- 2A. ADMIN PANEL -->
+            <!-- ======================================================== -->
+            <div v-if="currentRole === 'admin'" class="space-y-6">
+
+                <!-- Admin Tab Navigation -->
+                <div class="flex items-center gap-2 overflow-x-auto pb-2 border-b border-slate-200/80 dark:border-slate-800">
+                    <button @click="switchAdminNav('overview')" :class="['admin-nav-btn', { active: adminTab === 'overview' }]">
+                        <i class="fa-solid fa-chart-pie text-sm"></i> Executive Dashboard
+                    </button>
+                    <button @click="switchAdminNav('employees')" :class="['admin-nav-btn', { active: adminTab === 'employees' }]">
+                        <i class="fa-solid fa-users text-sm"></i> Employees (<span>{{ employees.length }}</span>)
+                    </button>
+                    <button @click="switchAdminNav('attendance')" :class="['admin-nav-btn', { active: adminTab === 'attendance' }]">
+                        <i class="fa-solid fa-clock-rotate-left text-sm"></i> Live Timesheets
+                    </button>
+                    <button @click="switchAdminNav('leaves')" :class="['admin-nav-btn', { active: adminTab === 'leaves' }]">
+                        <i class="fa-solid fa-calendar-check text-sm"></i> Leaves & Approvals
+                        <span v-if="adminPendingLeavesCount > 0" class="ml-1 px-1.5 py-0.5 rounded-full text-[10px] bg-amber-500 text-white font-extrabold">{{ adminPendingLeavesCount }}</span>
+                    </button>
+                    <button @click="switchAdminNav('reports')" :class="['admin-nav-btn', { active: adminTab === 'reports' }]">
+                        <i class="fa-solid fa-chart-bar text-sm"></i> Reports
+                    </button>
+                    <button @click="switchAdminNav('departments')" :class="['admin-nav-btn', { active: adminTab === 'departments' }]">
+                        <i class="fa-solid fa-sitemap text-sm"></i> Departments
+                    </button>
+                    <button @click="switchAdminNav('settings')" :class="['admin-nav-btn', { active: adminTab === 'settings' }]">
+                        <i class="fa-solid fa-sliders text-sm"></i> System & API
+                    </button>
+                </div>
+
+                <!-- ADMIN SECTION: OVERVIEW -->
+                <div v-show="adminTab === 'overview'" class="space-y-6">
+                    <!-- Banner -->
+                    <div class="p-6 sm:p-8 rounded-3xl bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 text-white relative overflow-hidden shadow-2xl flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+                        <div class="relative z-10">
+                            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/15 text-[11px] font-bold text-cyan-200 mb-3">
+                                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> ARK Shipping Executive Command
+                            </div>
+                            <h2 class="text-2xl sm:text-3xl font-black tracking-tight font-heading">Good day, <span>{{ currentUser.name }}</span> 👋</h2>
+                            <p class="text-sm text-blue-100/80 mt-1 max-w-lg">Workforce attendance, department operations, and leave approvals overview.</p>
+                        </div>
+                        <div class="relative z-10 flex items-center gap-3">
+                            <button @click="syncFromSupabase()" class="px-4 py-2.5 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/20 text-xs font-bold text-white flex items-center gap-2 backdrop-blur-md transition-all">
+                                <i class="fa-solid fa-arrows-rotate" :class="{ 'animate-spin': loading.visible }"></i> Sync Supabase
+                            </button>
+                            <button @click="openAddEmployeeModal" class="px-4 py-2.5 rounded-2xl bg-blue-600 hover:bg-blue-500 text-xs font-bold text-white flex items-center gap-2 shadow-lg shadow-blue-600/30 transition-all">
+                                <i class="fa-solid fa-plus"></i> Add Employee
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- KPI Cards Grid -->
+                    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
+                        <div class="p-4 sm:p-5 rounded-2xl glass-card kpi-card">
+                            <div class="flex items-center justify-between text-slate-400 text-xs font-bold uppercase"><span>Total Staff</span><i class="fa-solid fa-users text-blue-500"></i></div>
+                            <h3 class="text-2xl font-black mt-2 text-slate-900 dark:text-white font-heading">{{ employees.length }}</h3>
+                        </div>
+                        <div class="p-4 sm:p-5 rounded-2xl glass-card kpi-card">
+                            <div class="flex items-center justify-between text-slate-400 text-xs font-bold uppercase"><span>Present</span><i class="fa-solid fa-circle-check text-emerald-500"></i></div>
+                            <h3 class="text-2xl font-black mt-2 text-emerald-600 font-heading">{{ employees.filter(e => e.status === 'Active').length }}</h3>
+                        </div>
+                        <div class="p-4 sm:p-5 rounded-2xl glass-card kpi-card">
+                            <div class="flex items-center justify-between text-slate-400 text-xs font-bold uppercase"><span>Away</span><i class="fa-solid fa-clock text-amber-500"></i></div>
+                            <h3 class="text-2xl font-black mt-2 text-amber-600 font-heading">{{ employees.filter(e => e.status === 'Away').length }}</h3>
+                        </div>
+                        <div class="p-4 sm:p-5 rounded-2xl glass-card kpi-card">
+                            <div class="flex items-center justify-between text-slate-400 text-xs font-bold uppercase"><span>On Leave</span><i class="fa-solid fa-plane-departure text-purple-500"></i></div>
+                            <h3 class="text-2xl font-black mt-2 text-purple-600 font-heading">{{ employees.filter(e => e.status === 'On Leave').length }}</h3>
+                        </div>
+                        <div class="p-4 sm:p-5 rounded-2xl glass-card kpi-card">
+                            <div class="flex items-center justify-between text-slate-400 text-xs font-bold uppercase"><span>Late Arrival</span><i class="fa-solid fa-triangle-exclamation text-rose-500"></i></div>
+                            <h3 class="text-2xl font-black mt-2 text-rose-600 font-heading">{{ timesheets.filter(t => t.punctuality === 'Late Arrival').length }}</h3>
+                        </div>
+                        <div class="p-4 sm:p-5 rounded-2xl glass-card kpi-card">
+                            <div class="flex items-center justify-between text-slate-400 text-xs font-bold uppercase"><span>Pending Leaves</span><i class="fa-solid fa-envelope-open-text text-cyan-500"></i></div>
+                            <h3 class="text-2xl font-black mt-2 text-cyan-600 font-heading">{{ adminPendingLeavesCount }}</h3>
+                        </div>
+                    </div>
+
+                    <!-- Charts Row 1 -->
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <div class="glass-card p-6 rounded-3xl lg:col-span-2">
+                            <div class="flex items-center justify-between mb-4">
+                                <div>
+                                    <h3 class="text-base font-bold font-heading text-slate-900 dark:text-white">Weekly Attendance Performance</h3>
+                                    <p class="text-xs text-slate-400 mt-0.5">Average workforce turnout vs 90% benchmark</p>
+                                </div>
+                            </div>
+                            <div class="h-64"><canvas id="chart-admin-weekly-trend"></canvas></div>
+                        </div>
+
+                        <div class="glass-card p-6 rounded-3xl flex flex-col justify-between">
+                            <div>
+                                <h3 class="text-base font-bold font-heading text-slate-900 dark:text-white">Presence Distribution</h3>
+                                <p class="text-xs text-slate-400 mt-0.5">Real-time status ratio</p>
+                            </div>
+                            <div class="h-48 relative flex items-center justify-center my-2">
+                                <canvas id="chart-admin-presence-donut"></canvas>
+                                <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                                    <span class="text-2xl font-black font-heading text-slate-900 dark:text-white leading-none">
+                                        {{ employees.length ? Math.round((employees.filter(e => e.status === 'Active').length / employees.length) * 100) : 0 }}%
+                                    </span>
+                                    <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 mt-1">Active</span>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-3 gap-2 pt-3 border-t border-slate-100 dark:border-slate-800 text-center">
+                                <div>
+                                    <p class="text-[11px] text-slate-400">Present</p>
+                                    <p class="text-xs font-bold text-emerald-600">{{ employees.length ? Math.round((employees.filter(e => e.status === 'Active').length / employees.length) * 100) : 0 }}%</p>
+                                </div>
+                                <div>
+                                    <p class="text-[11px] text-slate-400">Away</p>
+                                    <p class="text-xs font-bold text-amber-500">{{ employees.length ? Math.round((employees.filter(e => e.status === 'Away').length / employees.length) * 100) : 0 }}%</p>
+                                </div>
+                                <div>
+                                    <p class="text-[11px] text-slate-400">Leave</p>
+                                    <p class="text-xs font-bold text-purple-500">{{ employees.length ? Math.round((employees.filter(e => e.status === 'On Leave').length / employees.length) * 100) : 0 }}%</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Charts Row 2 -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div class="glass-card p-6 rounded-3xl">
+                            <h3 class="text-base font-bold font-heading text-slate-900 dark:text-white mb-4">Department Headcount</h3>
+                            <div class="h-52"><canvas id="chart-dept-headcount"></canvas></div>
+                        </div>
+                        <div class="glass-card p-6 rounded-3xl">
+                            <h3 class="text-base font-bold font-heading text-slate-900 dark:text-white mb-4">Leave Type Breakdown</h3>
+                            <div class="flex items-center gap-6">
+                                <div class="h-44 flex-1 relative flex items-center justify-center">
+                                    <canvas id="chart-leave-types"></canvas>
+                                    <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                                        <span class="text-xl font-black font-heading text-slate-900 dark:text-white leading-none">{{ leaves.length }}</span>
+                                        <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 mt-0.5">Requests</span>
+                                    </div>
+                                </div>
+                                <div class="space-y-2 text-xs min-w-[110px]" id="leave-type-legend"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Pending Approvals & Live Activity Row -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div class="glass-card p-6 rounded-3xl">
+                            <div class="flex items-center justify-between mb-4">
+                                <h3 class="text-lg font-bold font-heading text-slate-900 dark:text-white">Pending Leave Requests</h3>
+                                <button @click="switchAdminNav('leaves')" class="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline">Manage All <i class="fa-solid fa-arrow-right text-[10px]"></i></button>
+                            </div>
+                            <div class="space-y-3">
+                                <p v-if="!pendingLeavesOverview.length" class="text-xs text-slate-400 py-4 text-center">No pending leave requests.</p>
+                                <div v-for="item in pendingLeavesOverview" :key="item.id" class="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 flex items-center justify-between gap-3">
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-9 h-9 rounded-xl bg-amber-100 dark:bg-amber-900/30 text-amber-600 flex items-center justify-center font-bold text-sm">
+                                            <i class="fa-solid fa-clock-rotate-left"></i>
+                                        </div>
+                                        <div>
+                                            <h4 class="text-xs font-bold text-slate-800 dark:text-white">{{ item.empName }}</h4>
+                                            <p class="text-[11px] text-slate-400">{{ item.type }} · {{ item.days }} day(s)</p>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center gap-1.5">
+                                        <template v-if="canAdminDecideLeave(item)">
+                                            <button @click="adminFinalDecide(item.id, 'Approved')" class="px-2.5 py-1 rounded-lg bg-emerald-600 text-white font-bold text-[11px] hover:bg-emerald-700 shadow-sm" :title="item.status === 'ManagerApproved' ? 'Final Approve' : 'Approve'"><i class="fa-solid fa-check"></i></button>
+                                            <button @click="adminFinalDecide(item.id, 'Rejected')" class="px-2.5 py-1 rounded-lg bg-rose-600 text-white font-bold text-[11px] hover:bg-rose-700 shadow-sm" title="Reject"><i class="fa-solid fa-xmark"></i></button>
+                                        </template>
+                                        <span v-else class="text-[10px] font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 rounded-full border border-amber-200 dark:border-amber-800">
+                                            <i class="fa-solid fa-clock mr-1"></i> Awaiting Mgr
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="glass-card p-6 rounded-3xl">
+                            <div class="flex items-center justify-between mb-4">
+                                <h3 class="text-lg font-bold font-heading text-slate-900 dark:text-white">Recent Workday Activity</h3>
+                                <button @click="switchAdminNav('attendance')" class="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline">Full Timesheet <i class="fa-solid fa-arrow-right text-[10px]"></i></button>
+                            </div>
+                            <div class="space-y-3">
+                                <p v-if="!timesheets.length" class="text-xs text-slate-400 text-center py-4">No activity yet</p>
+                                <div v-for="ts in timesheets.slice(0, 4)" :key="ts.id" class="flex items-start gap-3 p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800">
+                                    <span class="w-8 h-8 rounded-xl bg-blue-50 dark:bg-blue-900/30 text-blue-600 flex items-center justify-center text-xs flex-shrink-0"><i class="fa-solid fa-fingerprint"></i></span>
+                                    <div class="flex-1 min-w-0">
+                                        <p class="text-xs font-bold text-slate-800 dark:text-white truncate">{{ ts.empName }} <span class="font-normal text-slate-500">logged</span> <span class="text-blue-600 font-semibold">{{ ts.action }}</span></p>
+                                        <p class="text-[10px] text-slate-400 mt-0.5">{{ ts.date }} {{ ts.time }} · <strong :class="ts.punctuality === 'Late Arrival' ? 'text-rose-500' : 'text-emerald-600'">{{ ts.punctuality }}</strong></p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ADMIN SECTION: EMPLOYEES -->
+                <div v-show="adminTab === 'employees'" class="space-y-4">
+                    <div class="p-4 rounded-2xl glass-card flex flex-col md:flex-row items-center justify-between gap-4">
+                        <div class="flex flex-wrap items-center gap-3 w-full md:w-auto">
+                            <div class="relative w-full sm:w-64">
+                                <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 text-xs"><i class="fa-solid fa-magnifying-glass"></i></span>
+                                <input type="text" v-model="empFilter.search" placeholder="Filter by name, ID, or email..."
+                                       class="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                            </div>
+                            <select v-model="empFilter.dept" class="py-2 px-3 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100">
+                                <option value="All">All Departments</option>
+                                <option v-for="d in departmentList" :key="d" :value="d">{{ d }}</option>
+                            </select>
+                            <select v-model="empFilter.status" class="py-2 px-3 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100">
+                                <option value="All">All Statuses</option>
+                                <option value="Active">Active</option>
+                                <option value="Away">Away</option>
+                                <option value="On Leave">On Leave</option>
+                                <option value="Inactive">Inactive</option>
+                            </select>
+                        </div>
+                        <div class="flex items-center gap-2 w-full md:w-auto justify-end">
+                            <button @click="exportFullDataCSV" class="px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5 hover:bg-slate-100 dark:hover:bg-slate-800">
+                                <i class="fa-solid fa-file-csv text-blue-500"></i> Export Roster
+                            </button>
+                            <button @click="openAddEmployeeModal" class="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md shadow-blue-500/20 flex items-center gap-1.5">
+                                <i class="fa-solid fa-plus"></i> New Employee
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="rounded-3xl glass-card overflow-hidden">
+                        <div class="overflow-x-auto">
+                            <table class="w-full min-w-[650px] text-left border-collapse text-xs">
+                                <thead>
+                                <tr class="bg-slate-100/70 dark:bg-slate-800/60 border-b border-slate-200/80 dark:border-slate-700 text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider">
+                                    <th class="py-3.5 px-4">Employee</th>
+                                    <th class="py-3.5 px-4">ID</th>
+                                    <th class="py-3.5 px-4">Dept & Role</th>
+                                    <th class="py-3.5 px-4">Joined</th>
+                                    <th class="py-3.5 px-4">Status</th>
+                                    <th class="py-3.5 px-4 text-right">Actions</th>
+                                </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+                                <!-- Skeleton loading rows -->
+                                <tr v-if="skeletonLoading.employees" v-for="n in 5" :key="'skel-'+n">
+                                    <td class="py-3 px-4">
+                                        <div class="flex items-center gap-3">
+                                            <div class="skeleton skeleton-avatar"></div>
+                                            <div class="space-y-1.5">
+                                                <div class="skeleton h-3 w-28"></div>
+                                                <div class="skeleton h-2.5 w-36"></div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="py-3 px-4"><div class="skeleton h-3 w-10"></div></td>
+                                    <td class="py-3 px-4"><div class="skeleton h-3 w-28"></div></td>
+                                    <td class="py-3 px-4"><div class="skeleton h-3 w-20"></div></td>
+                                    <td class="py-3 px-4"><div class="skeleton skeleton-badge"></div></td>
+                                    <td class="py-3 px-4"><div class="skeleton h-3 w-14 ml-auto"></div></td>
+                                </tr>
+                                <!-- Actual employee rows -->
+                                <tr v-if="!skeletonLoading.employees" v-for="emp in filteredEmployees" :key="emp.id" class="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 cursor-pointer" @click="openEmployeeProfileModal(emp.id)">
+                                    <td class="py-3 px-4">
+                                        <div class="flex items-center gap-3">
+                                            <span class="w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-lg">{{ emp.avatar || '👨‍💼' }}</span>
+                                            <div>
+                                                <h4 class="font-bold text-slate-900 dark:text-white leading-tight">{{ emp.name }}</h4>
+                                                <span class="text-[11px] text-slate-400">{{ emp.email }}</span>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="py-3 px-4 font-mono font-bold text-slate-600 dark:text-slate-300">{{ emp.id }}</td>
+                                    <td class="py-3 px-4">
+                                        <p class="font-bold text-slate-800 dark:text-slate-200">{{ emp.role || 'Staff' }}</p>
+                                        <p class="text-[11px] text-blue-600 dark:text-blue-400 font-semibold">{{ emp.dept }}</p>
+                                    </td>
+                                    <td class="py-3 px-4 text-slate-400">{{ emp.joined || '—' }}</td>
+                                    <td class="py-3 px-4">
+                                        <span :class="['inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-extrabold', getBadgeClasses(emp.status)]">{{ emp.status }}</span>
+                                    </td>
+                                    <td class="py-3 px-4 text-right" @click.stop>
+                                        <div class="inline-flex items-center gap-1.5">
+                                            <button type="button" @click="openEmployeeProfileModal(emp.id)" class="p-1.5 text-slate-400 hover:text-blue-600" title="View Profile"><i class="fa-solid fa-address-card"></i></button>
+                                            <button type="button" @click="editEmployee(emp.id)" class="p-1.5 text-slate-400 hover:text-blue-600" title="Edit Employee"><i class="fa-solid fa-pen-to-square"></i></button>
+                                            <button type="button" @click="deleteEmployeePrompt(emp.id)" class="p-1.5 text-slate-400 hover:text-rose-600" title="Delete Employee"><i class="fa-solid fa-trash-can"></i></button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div v-if="!filteredEmployees.length" class="p-12 text-center">
+                            <i class="fa-solid fa-user-slash text-4xl text-slate-300 mb-3"></i>
+                            <h4 class="text-sm font-bold text-slate-700 dark:text-slate-300">No employees match your search</h4>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ADMIN SECTION: ATTENDANCE -->
+                <div v-show="adminTab === 'attendance'" class="space-y-4">
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                        <div class="glass-card p-5 rounded-3xl">
+                            <h3 class="text-base font-bold font-heading text-slate-900 dark:text-white mb-3">Arrival Compliance</h3>
+                            <div class="h-44 relative flex items-center justify-center">
+                                <canvas id="chart-att-punctuality"></canvas>
+                                <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none pb-6">
+                                    <span class="text-xl font-black font-heading text-emerald-600 leading-none" id="donut-att-ontime">0%</span>
+                                    <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 mt-0.5">On Time</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="glass-card p-5 rounded-3xl lg:col-span-2">
+                            <h3 class="text-base font-bold font-heading text-slate-900 dark:text-white mb-3">Today's Working Hours by Staff</h3>
+                            <div class="h-44"><canvas id="chart-att-hours"></canvas></div>
+                        </div>
+                    </div>
+                    <div class="p-4 rounded-2xl glass-card flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                        <div>
+                            <h3 class="text-base font-bold font-heading text-slate-900 dark:text-white">Workforce Daily Punch Log</h3>
+                            <p class="text-xs text-slate-500">NJ Shift: 8:00 AM – 6:00 PM (10h Shift)</p>
+                        </div>
+                        <button @click="exportAttendanceCSV" class="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center gap-1.5">
+                            <i class="fa-solid fa-download"></i> Export Timesheet
+                        </button>
+                    </div>
+                    <div class="rounded-3xl glass-card overflow-hidden">
+                        <div class="overflow-x-auto">
+                            <table class="w-full min-w-[650px] text-left border-collapse text-xs">
+                                <thead>
+                                <tr class="bg-slate-100/70 dark:bg-slate-800/60 border-b border-slate-200/80 dark:border-slate-700 text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider">
+                                    <th class="py-3.5 px-4">Staff</th>
+                                    <th class="py-3.5 px-4">Event</th>
+                                    <th class="py-3.5 px-4">Timestamp</th>
+                                    <th class="py-3.5 px-4">Logged</th>
+                                    <th class="py-3.5 px-4">Punctuality</th>
+                                </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+                                <tr v-for="ts in timesheets" :key="ts.id" class="hover:bg-slate-50/80 dark:hover:bg-slate-800/40">
+                                    <td class="py-3 px-4">
+                                        <div class="font-bold text-slate-800 dark:text-white">{{ ts.empName }}</div>
+                                        <div class="text-[10px] text-slate-400 font-mono">{{ ts.empId }}</div>
+                                    </td>
+                                    <td class="py-3 px-4 font-bold text-blue-600">{{ ts.action }}</td>
+                                    <td class="py-3 px-4 font-mono text-slate-600 dark:text-slate-300">{{ ts.date }} · {{ ts.time }}</td>
+                                    <td class="py-3 px-4 font-bold text-slate-900 dark:text-white">{{ ts.totalHours || '—' }}</td>
+                                    <td class="py-3 px-4">
+                                        <span :class="['inline-flex px-2.5 py-0.5 rounded-full text-[10px] font-extrabold', ts.punctuality === 'Late Arrival' ? 'bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400 border border-rose-200' : 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200']">
+                                            {{ ts.punctuality || 'On Time' }}
+                                        </span>
+                                    </td>
+                                </tr>
+                                <tr v-if="!timesheets.length">
+                                    <td colspan="5" class="py-8 text-center text-slate-400">No timesheet events recorded yet.</td>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ADMIN SECTION: LEAVES -->
+                <div v-show="adminTab === 'leaves'" class="space-y-6">
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+                        <div class="p-4 sm:p-5 rounded-2xl glass-card"><p class="text-xs font-bold text-slate-400 uppercase">Awaiting Admin</p><h4 class="text-2xl font-black text-amber-500 font-heading mt-1">{{ leaves.filter(l => canAdminDecideLeave(l)).length }}</h4></div>
+                        <div class="p-4 sm:p-5 rounded-2xl glass-card"><p class="text-xs font-bold text-slate-400 uppercase">Awaiting Mgr</p><h4 class="text-2xl font-black text-blue-600 font-heading mt-1">{{ leaves.filter(l => l.status === 'Pending' && !canAdminDecideLeave(l)).length }}</h4></div>
+                        <div class="p-4 sm:p-5 rounded-2xl glass-card"><p class="text-xs font-bold text-slate-400 uppercase">Approved</p><h4 class="text-2xl font-black text-emerald-600 font-heading mt-1">{{ leaves.filter(l => l.status === 'Approved').length }}</h4></div>
+                        <div class="p-4 sm:p-5 rounded-2xl glass-card"><p class="text-xs font-bold text-slate-400 uppercase">Rejected</p><h4 class="text-2xl font-black text-rose-500 font-heading mt-1">{{ leaves.filter(l => l.status === 'Rejected').length }}</h4></div>
+                    </div>
+
+                    <div class="rounded-3xl glass-card overflow-hidden">
+                        <div class="p-5 border-b border-slate-200/80 dark:border-slate-700 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <div>
+                                <h3 class="text-base font-bold font-heading text-slate-900 dark:text-white">Leave Requests & Approvals Queue</h3>
+                                <p class="text-xs text-slate-500">Employee → 1st Level Manager → 2nd Level Admin. Manager Leave → Direct Admin Decision.</p>
+                            </div>
+                            <select v-model="leaveFilterStatus" class="py-1.5 px-3 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100">
+                                <option value="All">All Statuses</option>
+                                <option value="Pending">Pending</option>
+                                <option value="ManagerApproved">Manager Approved</option>
+                                <option value="Approved">Approved</option>
+                                <option value="Rejected">Rejected</option>
+                            </select>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full min-w-[650px] text-left border-collapse text-xs">
+                                <thead>
+                                <tr class="bg-slate-100/70 dark:bg-slate-800/60 border-b border-slate-200/80 dark:border-slate-700 text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider">
+                                    <th class="py-3.5 px-4">Applicant</th>
+                                    <th class="py-3.5 px-4">Type</th>
+                                    <th class="py-3.5 px-4">Dates</th>
+                                    <th class="py-3.5 px-4">Reason</th>
+                                    <th class="py-3.5 px-4">Status & Audit</th>
+                                    <th class="py-3.5 px-4 text-right">Decision</th>
+                                </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+                                <tr v-for="lv in filteredAdminLeaves" :key="lv.id" class="hover:bg-slate-50/80 dark:hover:bg-slate-800/40">
+                                    <td class="py-3.5 px-4 cursor-pointer hover:text-blue-600" @click="openEmployeeProfileModal(lv.empId)">
+                                        <div class="font-bold text-slate-900 dark:text-white">{{ lv.empName }}</div>
+                                        <div class="text-[10px] text-slate-400 font-mono">{{ lv.empId }}</div>
+                                    </td>
+                                    <td class="py-3.5 px-4"><span class="inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">{{ lv.type }}</span></td>
+                                    <td class="py-3.5 px-4 font-semibold text-slate-700 dark:text-slate-300">{{ formatDateNice(lv.from) }} → {{ formatDateNice(lv.to) }} ({{ lv.days }}d)</td>
+                                    <td class="py-3.5 px-4 text-slate-500 max-w-xs truncate">{{ lv.reason || '—' }}</td>
+                                    <td class="py-3.5 px-4" v-html="getLeaveAuditBadge(lv)"></td>
+                                    <td class="py-3.5 px-4 text-right">
+                                        <div v-if="canAdminDecideLeave(lv)" class="inline-flex items-center gap-1.5">
+                                            <button @click="adminFinalDecide(lv.id, 'Approved')" class="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1 shadow-md shadow-emerald-500/20 transition-all">
+                                                <i class="fa-solid fa-check"></i> {{ lv.status === 'ManagerApproved' ? 'Final Approve' : 'Approve' }}
+                                            </button>
+                                            <button @click="adminFinalDecide(lv.id, 'Rejected')" class="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs flex items-center gap-1 shadow-md shadow-rose-500/20 transition-all">
+                                                <i class="fa-solid fa-xmark"></i> Reject
+                                            </button>
+                                        </div>
+                                        <span v-else-if="lv.status === 'Pending'" class="text-xs text-amber-600 font-bold bg-amber-50 dark:bg-amber-950/40 px-2.5 py-1 rounded-full border border-amber-200 dark:border-amber-800">
+                                            <i class="fa-solid fa-clock text-amber-500 mr-1"></i> Awaiting Manager Review
+                                        </span>
+                                        <span v-else class="text-xs text-slate-400 italic">Decided</span>
+                                    </td>
+                                </tr>
+                                <tr v-if="!filteredAdminLeaves.length">
+                                    <td colspan="6" class="py-8 text-center text-slate-400">No leave requests match filter.</td>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ADMIN SECTION: REPORTS -->
+                <div v-show="adminTab === 'reports'" class="space-y-6">
+                    <div>
+                        <h3 class="text-xl font-bold font-heading text-slate-900 dark:text-white">Reports & Workforce Analytics</h3>
+                        <p class="text-xs text-slate-500 mt-1">Individual and group insights on attendance, leaves, and team performance.</p>
+                    </div>
+                    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div class="p-5 rounded-2xl glass-card border-l-4 border-l-blue-500"><p class="text-[10px] font-bold uppercase text-slate-400">Total Check-ins</p><h4 class="text-2xl font-black font-heading text-slate-900 dark:text-white mt-1">{{ 180 + timesheets.length * 3 }}</h4></div>
+                        <div class="p-5 rounded-2xl glass-card border-l-4 border-l-emerald-500"><p class="text-[10px] font-bold uppercase text-slate-400">Avg Shift Hours</p><h4 class="text-2xl font-black font-heading text-emerald-600 mt-1">8.5h</h4></div>
+                        <div class="p-5 rounded-2xl glass-card border-l-4 border-l-amber-500"><p class="text-[10px] font-bold uppercase text-slate-400">Leave Days Taken</p><h4 class="text-2xl font-black font-heading text-amber-500 mt-1">{{ leaves.reduce((s,l)=>s+(Number(l.days)||0),0) }}</h4></div>
+                        <div class="p-5 rounded-2xl glass-card border-l-4 border-l-rose-500"><p class="text-[10px] font-bold uppercase text-slate-400">Late Arrivals</p><h4 class="text-2xl font-black font-heading text-rose-500 mt-1">{{ timesheets.filter(t => t.punctuality === 'Late Arrival').length }}</h4></div>
+                    </div>
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <div class="glass-card p-6 rounded-3xl lg:col-span-2">
+                            <h3 class="text-base font-bold font-heading text-slate-900 dark:text-white mb-4">30-Day Attendance Trend</h3>
+                            <div class="h-56"><canvas id="chart-monthly-attendance"></canvas></div>
+                        </div>
+                        <div class="glass-card p-6 rounded-3xl">
+                            <h3 class="text-base font-bold font-heading text-slate-900 dark:text-white mb-4">Top 5 Performers</h3>
+                            <div class="space-y-3">
+                                <div v-for="(e, i) in topPerformers" :key="e.id" class="flex items-center gap-3 p-2.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                                    <span :class="['w-7 h-7 rounded-lg flex items-center justify-center text-[11px] font-black', i===0?'bg-amber-100 text-amber-600':i===1?'bg-slate-200 text-slate-600':i===2?'bg-orange-100 text-orange-700':'bg-slate-100 dark:bg-slate-800 text-slate-500']">{{ i+1 }}</span>
+                                    <span class="text-lg">{{ e.avatar || '👨‍💼' }}</span>
+                                    <div class="flex-1 min-w-0">
+                                        <p class="text-xs font-bold text-slate-800 dark:text-white truncate">{{ e.name }}</p>
+                                        <p class="text-[10px] text-slate-400 truncate">{{ e.dept }}</p>
+                                    </div>
+                                    <span class="text-xs font-black text-emerald-600">{{ 98 - i*2 }}%</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Monthly Report Exports -->
+                    <div class="glass-card p-5 sm:p-6 rounded-3xl">
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+                            <div>
+                                <h4 class="text-base font-bold font-heading text-slate-900 dark:text-white">Monthly Report Export</h4>
+                                <p class="text-xs text-slate-500 mt-0.5">Select a month and export separate CSV files for Leaves and Attendance Hours.</p>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <label class="text-xs font-bold text-slate-500 uppercase tracking-wider">Month:</label>
+                                <select v-model="reportMonth" class="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-200">
+                                    <option v-for="m in availableMonths" :key="m.value" :value="m.value">{{ m.label }}</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="flex flex-wrap gap-3">
+                            <button @click="exportMonthlyLeavesCSV" class="px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold flex items-center gap-2 shadow-md shadow-purple-500/20 transition-all">
+                                <i class="fa-solid fa-file-csv"></i> Export Leaves Report
+                            </button>
+                            <button @click="exportMonthlyHoursCSV" class="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-2 shadow-md shadow-emerald-500/20 transition-all">
+                                <i class="fa-solid fa-clock"></i> Export Hours Report
+                            </button>
+                            <button @click="exportAttendanceCSV" class="px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-bold flex items-center gap-2 transition-all">
+                                <i class="fa-solid fa-table"></i> Full Timesheet CSV
+                            </button>
+                            <button @click="exportFullDataCSV" class="px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-bold flex items-center gap-2 transition-all">
+                                <i class="fa-solid fa-users"></i> Full Roster CSV
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ADMIN SECTION: DEPARTMENTS -->
+                <div v-show="adminTab === 'departments'" class="space-y-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h3 class="text-lg font-bold font-heading text-slate-900 dark:text-white">Organization Departments</h3>
+                            <p class="text-xs text-slate-500">Workforce distribution and department heads.</p>
+                        </div>
+                        <button @click="openAddDepartmentModal" class="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center gap-1.5">
+                            <i class="fa-solid fa-plus"></i> Add Department
+                        </button>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div v-for="dept in departmentOverview" :key="dept.name" class="glass-card p-6 rounded-3xl flex flex-col justify-between">
+                            <div>
+                                <div class="flex items-center justify-between">
+                                    <span class="w-10 h-10 rounded-2xl bg-blue-50 dark:bg-blue-900/30 text-blue-600 flex items-center justify-center text-lg">
+                                        <i :class="['fa-solid', dept.icon]"></i>
+                                    </span>
+                                    <span class="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">{{ dept.staffCount }} Staff</span>
+                                </div>
+                                <h4 class="text-base font-bold font-heading text-slate-900 dark:text-white mt-4">{{ dept.name }}</h4>
+                                <p class="text-xs text-slate-400 mt-1">Lead: <strong class="text-slate-700 dark:text-slate-300">{{ dept.leadName }}</strong></p>
+                            </div>
+                            <div class="mt-5 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
+                                <span class="text-slate-400">Budget</span>
+                                <strong class="text-slate-900 dark:text-white">{{ dept.budget }}</strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ADMIN SECTION: SETTINGS & SUPABASE -->
+                <div v-show="adminTab === 'settings'" class="space-y-6">
+
+                    <!-- Supabase Connection Card -->
+                    <div class="glass-card p-6 rounded-3xl space-y-4">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h3 class="text-base font-bold font-heading text-slate-900 dark:text-white flex items-center gap-2">
+                                    <i class="fa-solid fa-database text-emerald-500"></i> Supabase Database Connection
+                                </h3>
+                                <p class="text-xs text-slate-400 mt-0.5">Connect your live PostgreSQL database for persistent, real-time data.</p>
+                            </div>
+                            <!-- Connection status badge -->
+                            <span v-if="supabaseConnected"
+                                class="cloud-pill bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700">
+                                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Connected
+                            </span>
+                            <span v-else
+                                class="cloud-pill bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border border-amber-300 dark:border-amber-700">
+                                <span class="w-2 h-2 rounded-full bg-amber-400"></span> Local Mode
+                            </span>
+                        </div>
+
+                        <div class="space-y-3">
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-1 uppercase tracking-wider">Supabase Project URL</label>
+                                <input type="text" v-model="supabaseUrl" placeholder="https://xyzcompany.supabase.co"
+                                    class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-mono text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-1 uppercase tracking-wider">Anon Public Key</label>
+                                <input type="password" v-model="supabaseKey" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                                    class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-mono text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                        </div>
+
+                        <div class="flex items-center justify-between pt-1 border-t border-slate-100 dark:border-slate-800">
+                            <button @click="testSupabaseConnection" :disabled="loading.visible"
+                                class="px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50 transition-all">
+                                <i class="fa-solid fa-network-wired text-blue-500"></i> Test Connection
+                            </button>
+                            <button @click="saveSupabaseCredentials" :disabled="loading.visible"
+                                class="px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-bold shadow-md shadow-blue-500/25 flex items-center gap-1.5 disabled:opacity-50 transition-all">
+                                <i class="fa-solid fa-cloud-arrow-up"></i> Save &amp; Connect
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Workspace State Management -->
+                    <div class="glass-card p-6 rounded-3xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                        <div>
+                            <h4 class="text-sm font-bold text-slate-900 dark:text-white">Workspace State Management</h4>
+                            <p class="text-xs text-slate-500">Export JSON state backup or reset all mock local data.</p>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button @click="downloadJsonBackup" class="px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5 hover:bg-slate-100 dark:hover:bg-slate-800">
+                                <i class="fa-solid fa-cloud-arrow-down text-blue-500"></i> Backup JSON
+                            </button>
+                            <button @click="resetWorkspaceData" class="px-3.5 py-2 rounded-xl border border-rose-200 dark:border-rose-900 text-xs font-bold text-rose-600 flex items-center gap-1.5 hover:bg-rose-50 dark:hover:bg-rose-950/20">
+                                <i class="fa-solid fa-rotate-left"></i> Reset Workspace
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- ======================================================== -->
+            <!-- 2B. EMPLOYEE PORTAL -->
+            <!-- ======================================================== -->
+            <div v-else-if="currentRole === 'employee'" class="space-y-6">
+
+                <!-- Employee Top Banner -->
+                <div class="p-6 sm:p-8 rounded-3xl bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 text-white relative overflow-hidden shadow-2xl flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+                    <div class="relative z-10">
+                        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/15 text-[11px] font-bold text-cyan-200 mb-3">
+                            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Employee Workspace Active
+                        </div>
+                        <h2 class="text-2xl sm:text-3xl font-black tracking-tight font-heading">Welcome, <span>{{ currentUser.name }}</span> 👋</h2>
+                        <p class="text-sm text-blue-100/80 mt-1 max-w-lg">Track your daily shift, log breaks, manage leave balance, and review performance.</p>
+                    </div>
+                    <div class="relative z-10">
+                        <div class="p-4 sm:p-5 rounded-2xl bg-white/10 border border-white/20 backdrop-blur-md text-center min-w-[210px]">
+                            <div class="flex items-center justify-center gap-2 mb-1.5">
+                                <span class="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
+                                <span class="text-[11px] font-extrabold uppercase tracking-widest text-cyan-200">New Jersey, US</span>
+                            </div>
+                            <span class="text-2xl sm:text-3xl font-black font-mono tracking-tight block">{{ njClock.time }}</span>
+                            <div class="mt-2 flex items-center justify-center gap-2 text-[11px] font-bold text-blue-100/90">
+                                <span>{{ njClock.date }}</span>
+                                <span class="px-2 py-0.5 rounded-full bg-emerald-400/25 text-emerald-300 text-[10px] font-black">ET · Active</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Employee Sub-Navigation Tabs -->
+                <div class="flex items-center gap-2 border-b border-slate-200/80 dark:border-slate-800 pb-2 overflow-x-auto">
+                    <button @click="switchEmpTab('overview')" :class="['admin-nav-btn', { active: empTab === 'overview' }]">
+                        <i class="fa-solid fa-gauge"></i> Daily Desk
+                    </button>
+                    <button @click="switchEmpTab('team')" :class="['admin-nav-btn', { active: empTab === 'team' }]">
+                        <i class="fa-solid fa-users-viewfinder"></i> My Team
+                    </button>
+                    <button @click="switchEmpTab('leave')" :class="['admin-nav-btn', { active: empTab === 'leave' }]">
+                        <i class="fa-solid fa-calendar-days"></i> Leave & Approvals
+                        <span v-if="managerSubordinatePendingCount > 0" class="ml-1 px-1.5 py-0.5 rounded-full text-[10px] bg-amber-500 text-white font-extrabold">{{ managerSubordinatePendingCount }}</span>
+                    </button>
+                    <button @click="switchEmpTab('profile')" :class="['admin-nav-btn', { active: empTab === 'profile' }]">
+                        <i class="fa-solid fa-user-gear"></i> My Profile
+                    </button>
+                </div>
+
+                <!-- TAB: DAILY DESK -->
+                <div v-show="empTab === 'overview'" class="space-y-6">
+                    <!-- Manager Team Approval Required Banner -->
+                    <div v-if="isUserManager && managerSubordinatePendingCount > 0" class="p-4 sm:p-5 rounded-3xl bg-amber-500/10 border-2 border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div class="flex items-center gap-3.5">
+                            <div class="w-11 h-11 rounded-2xl bg-amber-500 text-white flex items-center justify-center font-bold text-lg shadow-lg shadow-amber-500/30 flex-shrink-0">
+                                <i class="fa-solid fa-user-clock"></i>
+                            </div>
+                            <div>
+                                <h4 class="text-sm font-black font-heading text-slate-900 dark:text-white flex items-center gap-2">
+                                    Team Leave Approvals Pending ({{ managerSubordinatePendingCount }})
+                                </h4>
+                                <p class="text-xs text-slate-500 mt-0.5">Your subordinates have applied for leave and require your 1st-level approval.</p>
+                            </div>
+                        </div>
+                        <button @click="switchEmpTab('leave')" class="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs flex items-center gap-2 self-start sm:self-auto shadow-md transition-all">
+                            <span>Review & Decide</span> <i class="fa-solid fa-arrow-right"></i>
+                        </button>
+                    </div>
+
+                    <div class="glass-card p-6 sm:p-8 rounded-3xl">
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                            <div>
+                                <h3 class="text-xl font-black font-heading text-slate-900 dark:text-white">Daily Shift & Attendance Hub</h3>
+                                <p class="text-xs text-slate-500 mt-1">{{ empActionHint }}</p>
+                            </div>
+                            <span :class="['px-3.5 py-1.5 rounded-full text-xs font-extrabold', empStatusPillClasses]">
+                                {{ empStatusPillText }}
+                            </span>
+                        </div>
+
+                        <!-- Shift Progress Bar + Live Tickers -->
+                        <div class="mb-6 p-4 rounded-2xl bg-slate-50/80 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">Daily Work Shift Progress (10 Hours Shift)</span>
+                                <div class="flex items-center gap-2">
+                                    <span class="text-sm font-black font-mono text-blue-600">{{ liveShiftMetrics.percent }}%</span>
+                                </div>
+                            </div>
+                            <div class="h-3.5 w-full bg-slate-200/80 dark:bg-slate-700 rounded-full overflow-hidden p-0.5">
+                                <div class="h-full rounded-full bg-gradient-to-r from-blue-600 via-indigo-600 to-emerald-500 transition-all duration-700" :style="{ width: liveShiftMetrics.percent + '%' }"></div>
+                            </div>
+                            <!-- Live H/M/S Metrics Row -->
+                            <div class="mt-3 grid grid-cols-3 gap-2 text-center">
+                                <div class="p-2 rounded-xl bg-emerald-50/80 dark:bg-emerald-950/30 border border-emerald-200/60 dark:border-emerald-800/50">
+                                    <span class="text-[9px] font-extrabold uppercase tracking-wider text-emerald-600 block">Net Work</span>
+                                    <span class="text-xs font-black font-mono text-emerald-700 dark:text-emerald-400 mt-0.5 block">{{ liveShiftMetrics.workFmt }}</span>
+                                </div>
+                                <div class="p-2 rounded-xl bg-amber-50/80 dark:bg-amber-950/30 border border-amber-200/60 dark:border-amber-800/50">
+                                    <span class="text-[9px] font-extrabold uppercase tracking-wider text-amber-600 block">Break Deducted</span>
+                                    <span class="text-xs font-black font-mono text-amber-700 dark:text-amber-400 mt-0.5 block">{{ liveShiftMetrics.breakFmt }}</span>
+                                </div>
+                                <div class="p-2 rounded-xl bg-blue-50/80 dark:bg-blue-950/30 border border-blue-200/60 dark:border-blue-800/50">
+                                    <span class="text-[9px] font-extrabold uppercase tracking-wider text-blue-600 block">Remaining</span>
+                                    <span class="text-xs font-black font-mono text-blue-700 dark:text-blue-400 mt-0.5 block">{{ liveShiftMetrics.remainFmt }}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Punch Buttons Grid -->
+                        <div class="grid grid-cols-2 sm:grid-cols-5 gap-3.5">
+                            <button @click="empPunchAction('Check In')" :disabled="isPunchDisabled('Check In')"
+                                    class="action-btn p-4 rounded-2xl border-2 border-emerald-500/30 bg-emerald-50/60 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 flex flex-col items-center gap-2 hover:scale-[1.02] transition-all font-bold text-xs disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100">
+                                <i class="fa-solid fa-right-to-bracket text-2xl"></i><span>Check In</span>
+                            </button>
+                            <button @click="empPunchAction('Break')" :disabled="isPunchDisabled('Break')"
+                                    class="action-btn p-4 rounded-2xl border-2 border-amber-500/30 bg-amber-50/60 dark:bg-amber-950/20 text-amber-600 dark:text-amber-400 flex flex-col items-center gap-2 hover:scale-[1.02] transition-all font-bold text-xs disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100">
+                                <i class="fa-solid fa-mug-hot text-2xl"></i><span>Break</span>
+                            </button>
+                            <button @click="empPunchAction('Step Away')" :disabled="isPunchDisabled('Step Away')"
+                                    class="action-btn p-4 rounded-2xl border-2 border-purple-500/30 bg-purple-50/60 dark:bg-purple-950/20 text-purple-600 dark:text-purple-400 flex flex-col items-center gap-2 hover:scale-[1.02] transition-all font-bold text-xs disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100">
+                                <i class="fa-solid fa-person-walking text-2xl"></i><span>Step Away</span>
+                            </button>
+                            <button @click="empPunchAction('Return Back')" :disabled="isPunchDisabled('Return Back')"
+                                    class="action-btn p-4 rounded-2xl border-2 border-blue-500/30 bg-blue-50/60 dark:bg-blue-950/20 text-blue-600 dark:text-blue-400 flex flex-col items-center gap-2 hover:scale-[1.02] transition-all font-bold text-xs disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100">
+                                <i class="fa-solid fa-rotate-left text-2xl"></i><span>Return</span>
+                            </button>
+                            <button @click="empPunchAction('Check Out')" :disabled="isPunchDisabled('Check Out')"
+                                    class="action-btn p-4 rounded-2xl border-2 border-rose-500/30 bg-rose-50/60 dark:bg-rose-950/20 text-rose-600 dark:text-rose-400 flex flex-col items-center gap-2 hover:scale-[1.02] transition-all font-bold text-xs col-span-2 sm:col-span-1 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100">
+                                <i class="fa-solid fa-right-from-bracket text-2xl"></i><span>Check Out</span>
+                            </button>
+                        </div>
+
+                        <!-- Active Shift Banner or Leave Notice -->
+                        <div v-if="employeeAttendanceState !== 'checkedOut'" class="mt-6 p-4 rounded-2xl bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200/50 dark:border-blue-800/40 flex items-center justify-between text-xs">
+                            <span class="text-slate-600 dark:text-slate-300">Shift active · NJ 8:00 AM – 6:00 PM (10 Hours Shift)</span>
+                            <span class="text-[11px] font-bold text-blue-600">Target: 10h 00m</span>
+                        </div>
+
+                        <!-- Checkout Summary Box -->
+                        <div v-if="employeeAttendanceState === 'checkedOut'" class="mt-6 p-5 rounded-2xl bg-gradient-to-br from-emerald-50/90 to-blue-50/80 dark:from-emerald-950/40 dark:to-blue-950/30 border-2 border-emerald-500/40 shadow-lg">
+                            <div class="flex items-center justify-between pb-4 border-b border-emerald-200/60 dark:border-emerald-800/60 mb-4">
+                                <h4 class="text-base font-extrabold text-slate-900 dark:text-white font-heading">Today's Work Shift Summary</h4>
+                                <span class="px-3 py-1 rounded-full text-xs font-black bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300"><i class="fa-solid fa-award mr-1"></i>Shift Completed</span>
+                            </div>
+                            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                                <div class="p-3.5 rounded-xl bg-white/85 dark:bg-slate-800/80 border border-slate-200/60 dark:border-slate-700">
+                                    <span class="text-slate-400 font-bold uppercase text-[10px] block">Check-In</span>
+                                    <strong class="text-slate-900 dark:text-white text-sm font-mono mt-1 block">{{ shiftSession.checkInTime || '—' }}</strong>
+                                </div>
+                                <div class="p-3.5 rounded-xl bg-white/85 dark:bg-slate-800/80 border border-slate-200/60 dark:border-slate-700">
+                                    <span class="text-slate-400 font-bold uppercase text-[10px] block">Check-Out</span>
+                                    <strong class="text-slate-900 dark:text-white text-sm font-mono mt-1 block">{{ shiftSession.checkOutTime || '—' }}</strong>
+                                </div>
+                                <div class="p-3.5 rounded-xl bg-white/85 dark:bg-slate-800/80 border border-slate-200/60 dark:border-slate-700">
+                                    <span class="text-slate-400 font-bold uppercase text-[10px] block">Break Deducted</span>
+                                    <strong class="text-amber-600 text-sm font-mono mt-1 block">{{ liveShiftMetrics.breakFmt }}</strong>
+                                </div>
+                                <div class="p-3.5 rounded-xl bg-white/85 dark:bg-slate-800/80 border border-slate-200/60 dark:border-slate-700">
+                                    <span class="text-slate-400 font-bold uppercase text-[10px] block">Net Hours (H·M·S)</span>
+                                    <strong class="text-emerald-600 text-sm font-mono font-black mt-1 block">{{ liveShiftMetrics.workFmt }}</strong>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Past 1-Week History Table -->
+                    <div class="glass-card p-4 sm:p-6 rounded-3xl">
+                        <h4 class="text-base sm:text-lg font-black font-heading text-slate-900 dark:text-white mb-4">Past 1-Week History</h4>
+                        <div class="overflow-x-auto rounded-2xl border border-slate-200/80 dark:border-slate-800">
+                            <table class="w-full min-w-[600px] text-left text-xs">
+                                <thead class="bg-slate-50 dark:bg-slate-800/60 text-slate-400 font-bold uppercase tracking-wider border-b border-slate-200 dark:border-slate-700">
+                                <tr>
+                                    <th class="py-3.5 px-4">Date</th>
+                                    <th class="py-3.5 px-4">Employee</th>
+                                    <th class="py-3.5 px-4">Check-In</th>
+                                    <th class="py-3.5 px-4">Check-Out</th>
+                                    <th class="py-3.5 px-4">Break</th>
+                                    <th class="py-3.5 px-4">Net</th>
+                                    <th class="py-3.5 px-4">Status</th>
+                                </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+                                <tr v-for="item in mockWeeklyCheckIns" :key="item.date" class="hover:bg-slate-50/80 dark:hover:bg-slate-800/40">
+                                    <td class="py-3 px-4 font-semibold text-slate-800 dark:text-white"><i class="fa-regular fa-calendar text-blue-500 mr-2"></i>{{ item.date }}</td>
+                                    <td class="py-3 px-4"><div class="flex items-center gap-2.5"><span class="w-8 h-8 rounded-xl bg-blue-100 dark:bg-blue-900/40 text-blue-600 flex items-center justify-center text-base">{{ currentUser.avatar || '👨‍💼' }}</span><span class="font-bold text-slate-800 dark:text-white">{{ currentUser.name }}</span></div></td>
+                                    <td class="py-3 px-4 font-bold text-emerald-600">{{ item.checkIn }}</td>
+                                    <td class="py-3 px-4 font-bold text-rose-500">{{ item.checkOut }}</td>
+                                    <td class="py-3 px-4 font-semibold text-amber-600">{{ item.breakDeducted || '0h 00m' }}</td>
+                                    <td class="py-3 px-4 font-bold text-slate-900 dark:text-white">{{ item.completed }}</td>
+                                    <td class="py-3 px-4"><span :class="['inline-flex px-2.5 py-0.5 rounded-full text-[10px] font-extrabold', item.onTime ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700']">{{ item.status }}</span></td>
+                                </tr>
+                                <tr v-if="!mockWeeklyCheckIns.length">
+                                    <td colspan="7" class="py-6 text-center text-slate-400">No attendance history found.</td>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- ═══════════════════════════════════════════════════════ -->
+                    <!-- MONTHLY ROSTER & PROGRESS (22-23 Working Days) -->
+                    <!-- ═══════════════════════════════════════════════════════ -->
+                    <div class="glass-card p-4 sm:p-6 rounded-3xl">
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5">
+                            <div>
+                                <h4 class="text-base sm:text-lg font-black font-heading text-slate-900 dark:text-white">Monthly Attendance Roster</h4>
+                                <p class="text-xs text-slate-500 mt-0.5">Sat &amp; Sun = Rest Day · Mon–Fri = 10h work day target</p>
+                            </div>
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <select v-if="rosterEmpOptions.length > 1" v-model="selectedRosterEmpId"
+                                    class="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-200">
+                                    <option v-for="opt in rosterEmpOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                                </select>
+                                <select v-model="selectedRosterMonth"
+                                    class="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-200">
+                                    <option v-for="m in availableMonths" :key="m.value" :value="m.value">{{ m.label }}</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Monthly Metrics Cards -->
+                        <div class="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-5">
+                            <div class="p-3 rounded-2xl bg-blue-50/80 dark:bg-blue-950/30 border border-blue-200/60 dark:border-blue-800/50 text-center">
+                                <span class="text-[10px] font-extrabold uppercase tracking-wider text-blue-600 block">Total Days</span>
+                                <span class="text-xl font-black text-blue-700 dark:text-blue-400 font-mono">{{ monthlyRosterData.totalDays }}</span>
+                            </div>
+                            <div class="p-3 rounded-2xl bg-emerald-50/80 dark:bg-emerald-950/30 border border-emerald-200/60 dark:border-emerald-800/50 text-center">
+                                <span class="text-[10px] font-extrabold uppercase tracking-wider text-emerald-600 block">Work Days</span>
+                                <span class="text-xl font-black text-emerald-700 dark:text-emerald-400 font-mono">{{ monthlyRosterData.workDays }}</span>
+                            </div>
+                            <div class="p-3 rounded-2xl bg-slate-100 dark:bg-slate-800/50 border border-slate-200/60 dark:border-slate-700/50 text-center">
+                                <span class="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 block">Rest Days</span>
+                                <span class="text-xl font-black text-slate-600 dark:text-slate-400 font-mono">{{ monthlyRosterData.restDays }}</span>
+                            </div>
+                            <div class="p-3 rounded-2xl bg-amber-50/80 dark:bg-amber-950/30 border border-amber-200/60 dark:border-amber-800/50 text-center">
+                                <span class="text-[10px] font-extrabold uppercase tracking-wider text-amber-600 block">Monthly Target</span>
+                                <span class="text-sm font-black text-amber-700 dark:text-amber-400 font-mono leading-tight">{{ monthlyRosterData.workDays * 10 }}h</span>
+                            </div>
+                            <div class="p-3 rounded-2xl bg-indigo-50/80 dark:bg-indigo-950/30 border border-indigo-200/60 dark:border-indigo-800/50 text-center">
+                                <span class="text-[10px] font-extrabold uppercase tracking-wider text-indigo-600 block">Progress</span>
+                                <span class="text-xl font-black text-indigo-700 dark:text-indigo-400 font-mono">{{ monthlyRosterData.progressPct }}%</span>
+                            </div>
+                        </div>
+
+                        <!-- Monthly Progress Bar -->
+                        <div class="mb-4 p-3 rounded-xl bg-slate-50/80 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60">
+                            <div class="flex justify-between text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-1.5">
+                                <span>Completed: <span class="text-emerald-600 font-mono">{{ monthlyRosterData.completedFmt }}</span></span>
+                                <span>Remaining: <span class="text-blue-600 font-mono">{{ monthlyRosterData.remainFmt }}</span></span>
+                            </div>
+                            <div class="h-3 w-full bg-slate-200/80 dark:bg-slate-700 rounded-full overflow-hidden p-0.5">
+                                <div class="h-full rounded-full bg-gradient-to-r from-emerald-500 to-blue-600 transition-all duration-700" :style="{ width: monthlyRosterData.progressPct + '%' }"></div>
+                            </div>
+                        </div>
+
+                        <!-- Day-by-Day Table -->
+                        <div class="overflow-x-auto rounded-2xl border border-slate-200/80 dark:border-slate-800">
+                            <table class="w-full min-w-[650px] text-left text-xs">
+                                <thead class="bg-slate-50 dark:bg-slate-800/60 text-slate-400 font-bold uppercase tracking-wider border-b border-slate-200 dark:border-slate-700">
+                                <tr>
+                                    <th class="py-3 px-3">Day</th>
+                                    <th class="py-3 px-3">Date</th>
+                                    <th class="py-3 px-3">Status</th>
+                                    <th class="py-3 px-3">Check-In</th>
+                                    <th class="py-3 px-3">Net Work</th>
+                                    <th class="py-3 px-3">Break</th>
+                                </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+                                <tr v-for="row in monthlyRosterData.rows" :key="row.dateStr"
+                                    :class="['transition-colors', row.isRest ? 'bg-slate-100/60 dark:bg-slate-800/30' : row.complete ? 'bg-emerald-50/40 dark:bg-emerald-950/10' : row.status === 'Today' ? 'bg-blue-50/50 dark:bg-blue-950/20' : '']">
+                                    <td class="py-2.5 px-3 font-bold text-slate-700 dark:text-slate-300 font-mono">{{ row.dayLabel }} {{ row.day }}</td>
+                                    <td class="py-2.5 px-3 font-mono text-slate-500">{{ row.dateStr }}</td>
+                                    <td class="py-2.5 px-3">
+                                        <span v-if="row.isRest" class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400">
+                                            <i class="fa-solid fa-moon text-slate-400"></i> Rest Day
+                                        </span>
+                                        <span v-else-if="row.status === 'Done'" class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400">
+                                            <i class="fa-solid fa-circle-check"></i> Done
+                                        </span>
+                                        <span v-else-if="row.status === 'Today'" class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-100 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 animate-pulse">
+                                            <i class="fa-solid fa-circle-dot"></i> Today
+                                        </span>
+                                        <span v-else-if="row.status === 'Absent'" class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-50 dark:bg-rose-950/30 text-rose-600">
+                                            <i class="fa-solid fa-xmark"></i> Absent
+                                        </span>
+                                        <span v-else class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-slate-100 dark:bg-slate-800 text-slate-400">
+                                            <i class="fa-regular fa-clock"></i> Upcoming
+                                        </span>
+                                    </td>
+                                    <td class="py-2.5 px-3 font-mono font-semibold text-emerald-600">{{ row.checkIn }}</td>
+                                    <td class="py-2.5 px-3 font-mono font-bold text-slate-900 dark:text-white">{{ row.netWork }}</td>
+                                    <td class="py-2.5 px-3 font-mono font-semibold text-amber-600">{{ row.breakTime }}</td>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB: MY TEAM -->
+                <div v-show="empTab === 'team'" class="space-y-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h3 class="text-xl font-black font-heading text-slate-900 dark:text-white">{{ isUserManager ? 'Team & Subordinates Directory' : 'Reporting Line & Department Hierarchy' }}</h3>
+                            <p class="text-xs text-slate-500">{{ isUserManager ? 'View status and direct subordinates reporting to you.' : 'Your official reporting manager and organizational structure.' }}</p>
+                        </div>
+                    </div>
+
+                    <!-- Manager View: Subordinates Grid -->
+                    <div v-if="isUserManager" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <p v-if="!userSubordinates.length" class="col-span-full p-8 text-center text-slate-400 glass-card rounded-3xl">No direct subordinates assigned to you yet.</p>
+                        <div v-for="emp in userSubordinates" :key="emp.id" class="glass-card p-5 rounded-3xl flex flex-col justify-between hover:border-blue-500/50 transition-all">
+                            <div>
+                                <div class="flex items-center justify-between mb-3">
+                                    <span class="w-12 h-12 rounded-2xl bg-blue-100 dark:bg-blue-900/40 text-blue-600 flex items-center justify-center text-2xl font-bold">{{ emp.avatar || '👨‍💼' }}</span>
+                                    <span :class="['inline-flex px-2.5 py-0.5 rounded-full text-[10px] font-extrabold', getBadgeClasses(emp.status)]">{{ emp.status }}</span>
+                                </div>
+                                <h4 class="text-base font-bold font-heading text-slate-900 dark:text-white leading-tight">{{ emp.name }}</h4>
+                                <p class="text-xs text-slate-500 font-medium mt-0.5">{{ emp.role || 'Staff Member' }}</p>
+                                <div class="mt-2 text-[11px] text-slate-400 font-mono">ID: {{ emp.id }} · {{ emp.dept }}</div>
+                            </div>
+                            <div class="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                                <span class="text-[11px] text-slate-400 font-semibold">Joined: {{ emp.joined || '—' }}</span>
+                                <button @click="openEmployeeProfileModal(emp.id)" class="px-3 py-1.5 rounded-xl bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 font-bold text-xs hover:bg-blue-600 hover:text-white transition-colors">
+                                    <i class="fa-solid fa-address-card mr-1"></i> Profile
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Subordinate View: Reporting Manager Card -->
+                    <div v-else class="space-y-6">
+                        <div class="p-6 rounded-3xl glass-card border-2 border-blue-500/20">
+                            <div class="flex items-center gap-2 text-xs font-extrabold uppercase tracking-widest text-blue-600 mb-4">
+                                <i class="fa-solid fa-sitemap"></i> Your Reporting Manager & Hierarchy
+                            </div>
+                            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-6 p-5 rounded-2xl bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200/50 dark:border-blue-800/40">
+                                <div class="flex items-center gap-4">
+                                    <span class="w-16 h-16 rounded-2xl bg-blue-100 dark:bg-blue-900/40 text-blue-600 flex items-center justify-center text-3xl shadow-md">{{ userReportingManager.avatar }}</span>
+                                    <div>
+                                        <span class="text-[10px] font-extrabold uppercase tracking-wider text-blue-600">Reporting Lead</span>
+                                        <h4 class="text-lg font-black font-heading text-slate-900 dark:text-white mt-0.5">{{ userReportingManager.name }}</h4>
+                                        <p class="text-xs text-slate-500 font-medium">{{ userReportingManager.role }} · <span class="font-semibold text-slate-700 dark:text-slate-300">{{ userReportingManager.dept }}</span></p>
+                                        <p class="text-[11px] text-slate-400 mt-1"><i class="fa-regular fa-envelope mr-1"></i>{{ userReportingManager.email }}</p>
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-2 text-xs font-bold text-slate-600 dark:text-slate-300 bg-white/80 dark:bg-slate-800/80 px-4 py-2.5 rounded-xl border border-slate-200/80 dark:border-slate-700">
+                                    <span>Reporting Line:</span>
+                                    <span class="text-blue-600 font-extrabold">{{ currentUser.name }}</span>
+                                    <i class="fa-solid fa-arrow-right text-xs text-slate-400"></i>
+                                    <span class="text-emerald-600 font-extrabold">{{ userReportingManager.name }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB: LEAVES -->
+                <div v-show="empTab === 'leave'" class="space-y-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h3 class="text-xl font-black font-heading text-slate-900 dark:text-white">Leave Allowance & Applications</h3>
+                            <p class="text-xs text-slate-500">Submit requests for annual, sick, or remote work.</p>
+                        </div>
+                        <button @click="openApplyLeaveModal" class="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-lg flex items-center gap-2">
+                            <i class="fa-solid fa-plane-departure"></i> Apply for Leave
+                        </button>
+                    </div>
+
+                    <!-- Manager: Subordinate Leave Requests Section -->
+                    <div v-if="isUserManager" class="rounded-3xl glass-card overflow-hidden border-2 border-amber-500/30">
+                        <div class="p-4 sm:p-5 border-b border-slate-200/80 dark:border-slate-700 bg-amber-500/5 flex items-center justify-between">
+                            <div>
+                                <h4 class="text-sm font-bold font-heading text-slate-900 dark:text-white flex items-center gap-2">
+                                    <i class="fa-solid fa-user-check text-amber-500"></i> Subordinate Leave Requests (Action Required)
+                                </h4>
+                                <p class="text-[11px] text-slate-500 mt-0.5">Review and accept or reject leave requests submitted by your team members.</p>
+                            </div>
+                            <span class="px-2.5 py-1 rounded-full text-xs font-black bg-amber-500 text-white">{{ managerSubordinatePendingCount }} Pending</span>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full min-w-[600px] text-left text-xs">
+                                <thead>
+                                <tr class="bg-slate-50 dark:bg-slate-800/50 text-slate-400 font-bold uppercase tracking-wider border-b border-slate-200 dark:border-slate-700">
+                                    <th class="py-3 px-4">Subordinate</th>
+                                    <th class="py-3 px-4">Type</th>
+                                    <th class="py-3 px-4">Dates</th>
+                                    <th class="py-3 px-4">Reason</th>
+                                    <th class="py-3 px-4">Status & Decision Audit</th>
+                                    <th class="py-3 px-4 text-right">Action</th>
+                                </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+                                <tr v-for="lv in managerSubordinateLeaves" :key="lv.id" class="hover:bg-slate-50/80 dark:hover:bg-slate-800/40">
+                                    <td class="py-3.5 px-4 font-bold text-slate-900 dark:text-white cursor-pointer hover:text-blue-600" @click="openEmployeeProfileModal(lv.empId)">
+                                        {{ lv.empName }} <span class="text-[10px] text-slate-400 block font-mono">{{ lv.empId }}</span>
+                                    </td>
+                                    <td class="py-3.5 px-4 font-bold text-blue-600">{{ lv.type }}</td>
+                                    <td class="py-3.5 px-4 font-semibold text-slate-700 dark:text-slate-300">{{ formatDateNice(lv.from) }} → {{ formatDateNice(lv.to) }} ({{ lv.days }}d)</td>
+                                    <td class="py-3.5 px-4 text-slate-500 max-w-xs truncate">{{ lv.reason || '—' }}</td>
+                                    <td class="py-3.5 px-4" v-html="getLeaveAuditBadge(lv)"></td>
+                                    <td class="py-3.5 px-4 text-right">
+                                        <div v-if="lv.status === 'Pending'" class="inline-flex items-center gap-1.5">
+                                            <button @click="managerDecideLeave(lv.id, 'Approved')" class="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1 shadow-md shadow-emerald-500/20 transition-all">
+                                                <i class="fa-solid fa-check"></i> Accept
+                                            </button>
+                                            <button @click="managerDecideLeave(lv.id, 'Rejected')" class="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs flex items-center gap-1 shadow-md shadow-rose-500/20 transition-all">
+                                                <i class="fa-solid fa-xmark"></i> Reject
+                                            </button>
+                                        </div>
+                                        <span v-else-if="lv.status === 'ManagerApproved'" class="text-xs text-blue-600 font-bold bg-blue-50 dark:bg-blue-950/40 px-2.5 py-1 rounded-full border border-blue-200 dark:border-blue-800">
+                                            <i class="fa-solid fa-check-double text-blue-500 mr-1"></i> Approved · Sent to Admin
+                                        </span>
+                                        <span v-else-if="lv.status === 'Approved'" class="text-xs text-emerald-600 font-bold bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-1 rounded-full border border-emerald-200 dark:border-emerald-800">
+                                            <i class="fa-solid fa-circle-check text-emerald-500 mr-1"></i> Admin Approved
+                                        </span>
+                                        <span v-else-if="lv.status === 'Rejected'" class="text-xs text-rose-600 font-bold bg-rose-50 dark:bg-rose-950/40 px-2.5 py-1 rounded-full border border-rose-200 dark:border-rose-800">
+                                            <i class="fa-solid fa-circle-xmark text-rose-500 mr-1"></i> Rejected
+                                        </span>
+                                        <span v-else class="text-xs text-slate-400 italic">Decided</span>
+                                    </td>
+                                </tr>
+                                <tr v-if="!managerSubordinateLeaves.length">
+                                    <td colspan="6" class="py-6 text-center text-slate-400">No subordinate leave requests found.</td>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- My Submitted Requests Table -->
+                    <div class="rounded-3xl glass-card overflow-hidden">
+                        <div class="p-4 sm:p-5 border-b border-slate-200/80 dark:border-slate-700">
+                            <h4 class="text-sm font-bold font-heading text-slate-900 dark:text-white">My Submitted Requests</h4>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full min-w-[550px] text-left text-xs">
+                                <thead>
+                                <tr class="bg-slate-50 dark:bg-slate-800/50 text-slate-400 font-bold uppercase tracking-wider border-b border-slate-200 dark:border-slate-700">
+                                    <th class="py-3 px-4">Type</th>
+                                    <th class="py-3 px-4">Duration</th>
+                                    <th class="py-3 px-4">Reason</th>
+                                    <th class="py-3 px-4">Status & Decision Audit</th>
+                                </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+                                <tr v-for="lv in mySubmittedLeaves" :key="lv.id" class="hover:bg-slate-50/80 dark:hover:bg-slate-800/40">
+                                    <td class="py-3 px-4 font-bold text-slate-800 dark:text-white">{{ lv.type }}</td>
+                                    <td class="py-3 px-4 font-semibold text-slate-600 dark:text-slate-300">{{ formatDateNice(lv.from) }} → {{ formatDateNice(lv.to) }} ({{ lv.days }}d)</td>
+                                    <td class="py-3 px-4 text-slate-500 max-w-xs truncate">{{ lv.reason || '—' }}</td>
+                                    <td class="py-3 px-4" v-html="getLeaveAuditBadge(lv)"></td>
+                                </tr>
+                                <tr v-if="!mySubmittedLeaves.length">
+                                    <td colspan="4" class="py-6 text-center text-slate-400">No leave applications submitted yet.</td>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB: PROFILE -->
+                <div v-show="empTab === 'profile'" class="space-y-6">
+                    <div class="glass-card p-6 sm:p-8 rounded-3xl">
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-6 pb-6 border-b border-slate-200/80 dark:border-slate-800">
+                            <div class="flex items-center gap-5">
+                                <button @click="openAvatarPicker" class="w-20 h-20 rounded-3xl bg-blue-100 dark:bg-blue-900/40 text-blue-600 flex items-center justify-center text-4xl shadow-lg hover:scale-105 transition-transform" title="Click to change avatar">
+                                    <span>{{ currentUser.avatar || '👨‍💼' }}</span>
+                                </button>
+                                <div>
+                                    <span class="text-xs font-bold text-blue-600 uppercase tracking-widest">Verified Employee</span>
+                                    <h3 class="text-2xl font-black font-heading text-slate-900 dark:text-white mt-0.5">{{ currentUser.name }}</h3>
+                                    <p class="text-xs text-slate-500">{{ currentUser.designation || 'Staff Member' }} · {{ currentUser.dept }}</p>
+                                </div>
+                            </div>
+                            <button @click="openEditProfileModal" class="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center gap-2">
+                                <i class="fa-solid fa-pen-to-square"></i> Edit Profile
+                            </button>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mt-6">
+                            <div class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50">
+                                <span class="text-[11px] text-slate-400 font-bold uppercase block">Employee ID</span>
+                                <span class="text-sm font-extrabold text-slate-800 dark:text-white mt-1 block">{{ currentUser.id }}</span>
+                            </div>
+                            <div class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50">
+                                <span class="text-[11px] text-slate-400 font-bold uppercase block">Email</span>
+                                <span class="text-sm font-extrabold text-slate-800 dark:text-white mt-1 block">{{ currentUser.email }}</span>
+                            </div>
+                            <div class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50">
+                                <span class="text-[11px] text-slate-400 font-bold uppercase block">Department</span>
+                                <span class="text-sm font-extrabold text-slate-800 dark:text-white mt-1 block">{{ currentUser.dept }}</span>
+                            </div>
+                        </div>
+
+                        <!-- Reporting Line section -->
+                        <div class="mt-6 pt-6 border-t border-slate-200/80 dark:border-slate-800">
+                            <h4 class="text-sm font-bold font-heading text-slate-900 dark:text-white mb-3 flex items-center gap-2">
+                                <i class="fa-solid fa-sitemap text-blue-600"></i> Reporting Line & Organizational Hierarchy
+                            </h4>
+                            <div class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 text-xs space-y-4">
+                                <div class="flex items-center justify-between p-3.5 rounded-xl bg-white/80 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700">
+                                    <div class="flex items-center gap-3">
+                                        <span class="w-10 h-10 rounded-xl bg-blue-100 dark:bg-blue-900/40 text-blue-600 flex items-center justify-center text-xl font-bold">{{ userReportingManager.avatar }}</span>
+                                        <div>
+                                            <span class="text-[10px] font-extrabold uppercase text-blue-600 tracking-wider block">Your Direct Manager / Lead</span>
+                                            <strong class="text-sm font-black text-slate-900 dark:text-white block">{{ userReportingManager.name }}</strong>
+                                            <span class="text-[11px] text-slate-500 block">{{ userReportingManager.role }} · {{ userReportingManager.dept }}</span>
+                                        </div>
+                                    </div>
+                                    <span class="px-3 py-1 rounded-full text-[10px] font-extrabold bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300">Reporting Line</span>
+                                </div>
+
+                                <div v-if="userSubordinates.length > 0" class="pt-2">
+                                    <span class="text-[11px] font-extrabold uppercase tracking-wider text-slate-400 block mb-2">Direct Subordinates Reporting To You ({{ userSubordinates.length }})</span>
+                                    <div class="flex flex-wrap gap-2">
+                                        <span v-for="s in userSubordinates" :key="s.id" @click="openEmployeeProfileModal(s.id)" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 text-xs font-bold cursor-pointer hover:scale-105 transition-transform">
+                                            <span>{{ s.avatar || '👨‍💼' }}</span>
+                                            <span>{{ s.name }}</span>
+                                            <span class="text-[10px] text-slate-400 font-mono">({{ s.id }})</span>
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+        </main>
+    </div>
+
+    <!-- ======================================================== -->
+    <!-- 3. MODALS -->
+    <!-- ======================================================== -->
+
+    <!-- MODAL: ADD / EDIT EMPLOYEE -->
+    <div v-if="modals.employee" class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/50 backdrop-blur-md overflow-y-auto">
+        <div class="w-full max-w-lg my-auto p-5 sm:p-8 rounded-2xl sm:rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl overflow-y-auto max-h-[90vh]">
+            <div class="flex items-center justify-between pb-3 sm:pb-4 border-b border-slate-100 dark:border-slate-800 mb-4 sm:mb-5">
+                <h3 class="text-base sm:text-lg font-bold font-heading text-slate-900 dark:text-white">{{ empForm.id ? 'Edit: ' + empForm.name : 'Add New Employee' }}</h3>
+                <button @click="modals.employee = false" class="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 flex items-center justify-center"><i class="fa-solid fa-xmark text-sm"></i></button>
+            </div>
+            <form @submit.prevent="saveEmployeeSubmit" class="space-y-3 sm:space-y-4">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold uppercase text-slate-500 mb-1">Full Name</label>
+                        <input type="text" v-model="empForm.name" required placeholder="Employee full name" class="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs sm:text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold uppercase text-slate-500 mb-1">Email</label>
+                        <input type="email" v-model="empForm.email" required placeholder="name@ark.com" class="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs sm:text-sm">
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold uppercase text-slate-500 mb-1">Department</label>
+                        <select v-model="empForm.dept" class="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs sm:text-sm">
+                            <option v-for="d in departmentList" :key="d" :value="d">{{ d }}</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold uppercase text-slate-500 mb-1">Role / Designation</label>
+                        <input type="text" v-model="empForm.role" required placeholder="e.g. Accounts Manager" class="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs sm:text-sm">
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold uppercase text-slate-500 mb-1">Status</label>
+                        <select v-model="empForm.status" class="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs sm:text-sm">
+                            <option value="Active">Active</option>
+                            <option value="Away">Away</option>
+                            <option value="On Leave">On Leave</option>
+                            <option value="Inactive">Inactive</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold uppercase text-slate-500 mb-1">Manager ID</label>
+                        <input type="text" v-model="empForm.managerId" placeholder="e.g. 1 (Admin) or 101" class="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs sm:text-sm">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold uppercase text-slate-500 mb-1">Password <span class="text-slate-400 normal-case">(blank = default 123456)</span></label>
+                    <input type="text" v-model="empForm.password" placeholder="123456" class="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs sm:text-sm">
+                </div>
+                <div class="pt-3 sm:pt-4 flex justify-end gap-2 border-t border-slate-100 dark:border-slate-800">
+                    <button type="button" @click="modals.employee = false" class="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-600 dark:text-slate-300">Cancel</button>
+                    <button type="submit" class="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md shadow-blue-500/20">Save Employee</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: APPLY FOR LEAVE -->
+    <div v-if="modals.applyLeave" class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/50 backdrop-blur-md overflow-y-auto">
+        <div class="w-full max-w-md my-auto p-5 sm:p-8 rounded-2xl sm:rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl overflow-y-auto max-h-[90vh]">
+            <div class="flex items-center justify-between pb-3 sm:pb-4 border-b border-slate-100 dark:border-slate-800 mb-4 sm:mb-5">
+                <h3 class="text-base sm:text-lg font-bold font-heading text-slate-900 dark:text-white">Apply for Leave</h3>
+                <button @click="modals.applyLeave = false" class="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 flex items-center justify-center"><i class="fa-solid fa-xmark text-sm"></i></button>
+            </div>
+            <form @submit.prevent="submitApplyLeave" class="space-y-3 sm:space-y-4">
+                <div>
+                    <label class="block text-xs font-bold uppercase text-slate-500 mb-1">Leave Category</label>
+                    <select v-model="leaveForm.type" class="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs sm:text-sm">
+                        <option value="Annual Leave">Annual Leave</option>
+                        <option value="Sick Leave">Sick / Medical Leave</option>
+                        <option value="Casual Leave">Casual / Personal</option>
+                        <option value="Work From Home">Work From Home</option>
+                    </select>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold uppercase text-slate-500 mb-1">Start Date</label>
+                        <input type="date" v-model="leaveForm.from" required class="w-full p-2.5 sm:p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs sm:text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold uppercase text-slate-500 mb-1">End Date</label>
+                        <input type="date" v-model="leaveForm.to" required class="w-full p-2.5 sm:p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs sm:text-sm">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold uppercase text-slate-500 mb-1">Reason</label>
+                    <textarea v-model="leaveForm.reason" rows="3" required placeholder="Brief note explaining reason..." class="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs sm:text-sm"></textarea>
+                </div>
+                <div class="pt-3 flex justify-end gap-2 border-t border-slate-100 dark:border-slate-800">
+                    <button type="button" @click="modals.applyLeave = false" class="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-600 dark:text-slate-300">Cancel</button>
+                    <button type="submit" :disabled="isSubmittingLeave" class="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md shadow-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
+                        <i v-if="isSubmittingLeave" class="fa-solid fa-spinner animate-spin text-xs"></i>
+                        <span>{{ isSubmittingLeave ? 'Submitting...' : 'Submit Request' }}</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: ADD DEPARTMENT -->
+    <div v-if="modals.department" class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/50 backdrop-blur-md overflow-y-auto">
+        <div class="w-full max-w-md my-auto p-5 sm:p-8 rounded-2xl sm:rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl overflow-y-auto max-h-[90vh]">
+            <div class="flex items-center justify-between pb-3 sm:pb-4 border-b border-slate-100 dark:border-slate-800 mb-4 sm:mb-5">
+                <h3 class="text-base sm:text-lg font-bold font-heading text-slate-900 dark:text-white">Add Department</h3>
+                <button @click="modals.department = false" class="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 flex items-center justify-center"><i class="fa-solid fa-xmark text-sm"></i></button>
+            </div>
+            <form @submit.prevent="saveDepartmentSubmit" class="space-y-3 sm:space-y-4">
+                <div><label class="block text-xs font-bold uppercase text-slate-500 mb-1">Department Name</label><input type="text" v-model="deptForm.name" required placeholder="e.g. Logistics" class="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs sm:text-sm"></div>
+                <div><label class="block text-xs font-bold uppercase text-slate-500 mb-1">Head ID</label><input type="text" v-model="deptForm.headId" placeholder="e.g. 101" class="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs sm:text-sm"></div>
+                <div><label class="block text-xs font-bold uppercase text-slate-500 mb-1">Head Name</label><input type="text" v-model="deptForm.headName" placeholder="Manager full name" class="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs sm:text-sm"></div>
+                <div><label class="block text-xs font-bold uppercase text-slate-500 mb-1">Budget</label><input type="text" v-model="deptForm.budget" placeholder="e.g. $10,000" class="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs sm:text-sm"></div>
+                <div class="pt-3 sm:pt-4 flex justify-end gap-2 border-t border-slate-100 dark:border-slate-800">
+                    <button type="button" @click="modals.department = false" class="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-600 dark:text-slate-300">Cancel</button>
+                    <button type="submit" class="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md shadow-blue-500/20">Save Department</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: AVATAR PICKER -->
+    <div v-if="modals.avatar" class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/50 backdrop-blur-md overflow-y-auto">
+        <div class="w-full max-w-sm my-auto p-5 sm:p-6 rounded-2xl sm:rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl overflow-y-auto max-h-[90vh]">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800 mb-4">
+                <h4 class="text-base font-bold font-heading text-slate-900 dark:text-white">Pick Avatar</h4>
+                <button @click="modals.avatar = false" class="w-7 h-7 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 flex items-center justify-center"><i class="fa-solid fa-xmark text-xs"></i></button>
+            </div>
+            <div class="grid grid-cols-5 gap-2.5">
+                <button v-for="av in avatarList" :key="av" type="button" @click="selectAvatar(av)"
+                        class="h-12 w-12 rounded-2xl text-2xl flex items-center justify-center bg-slate-50 dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-900/40 hover:scale-110 transition-all border border-slate-200/60 dark:border-slate-700">
+                    {{ av }}
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: EDIT PROFILE -->
+    <div v-if="modals.editProfile" class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/50 backdrop-blur-md overflow-y-auto">
+        <div class="w-full max-w-md my-auto p-5 sm:p-6 rounded-2xl sm:rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl overflow-y-auto max-h-[90vh]">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800 mb-4">
+                <h4 class="text-base font-bold font-heading text-slate-900 dark:text-white">Edit Profile</h4>
+                <button @click="modals.editProfile = false" class="w-7 h-7 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 flex items-center justify-center"><i class="fa-solid fa-xmark text-xs"></i></button>
+            </div>
+            <form @submit.prevent="saveProfileInfo" class="space-y-3 text-xs sm:text-sm">
+                <div><label class="block text-slate-500 font-semibold mb-1">Name</label><input type="text" v-model="profileForm.name" required class="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800"></div>
+                <div><label class="block text-slate-500 font-semibold mb-1">Email</label><input type="email" v-model="profileForm.email" required class="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800"></div>
+                <div><label class="block text-slate-500 font-semibold mb-1">Designation</label><input type="text" v-model="profileForm.role" required class="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800"></div>
+                <div class="pt-3 flex justify-end gap-2 border-t border-slate-100 dark:border-slate-800">
+                    <button type="button" @click="modals.editProfile = false" class="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 font-bold text-slate-600 dark:text-slate-300">Cancel</button>
+                    <button type="submit" class="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-md shadow-blue-500/20">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: VIEW FULL EMPLOYEE PROFILE -->
+    <div v-if="modals.viewProfile && viewedEmployee" class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/50 backdrop-blur-md overflow-y-auto">
+        <div class="w-full max-w-2xl my-auto p-5 sm:p-8 rounded-2xl sm:rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl overflow-y-auto max-h-[90vh]">
+            <div class="flex items-center justify-between pb-3 sm:pb-4 border-b border-slate-100 dark:border-slate-800 mb-4 sm:mb-5">
+                <h3 class="text-base sm:text-lg font-bold font-heading text-slate-900 dark:text-white">Employee Profile Card</h3>
+                <button @click="modals.viewProfile = false" class="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 flex items-center justify-center"><i class="fa-solid fa-xmark text-sm"></i></button>
+            </div>
+            <div class="space-y-6">
+                <div class="flex items-center gap-4 pb-4 border-b border-slate-100 dark:border-slate-800">
+                    <span class="w-16 h-16 rounded-2xl bg-blue-100 dark:bg-blue-900/40 text-blue-600 flex items-center justify-center text-3xl font-bold shadow-md">{{ viewedEmployee.avatar || '👨‍💼' }}</span>
+                    <div>
+                        <h3 class="text-xl font-black font-heading text-slate-900 dark:text-white">{{ viewedEmployee.name }}</h3>
+                        <p class="text-xs text-slate-500 font-medium">{{ viewedEmployee.role || 'Staff Member' }} · <span class="text-blue-600 font-semibold">{{ viewedEmployee.dept }}</span></p>
+                        <div class="mt-1 flex items-center gap-2">
+                            <span :class="['inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold', getBadgeClasses(viewedEmployee.status)]">{{ viewedEmployee.status }}</span>
+                            <span class="text-[10px] text-slate-400 font-mono">ID: {{ viewedEmployee.id }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+                    <div class="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/50">
+                        <span class="text-[10px] font-bold uppercase text-slate-400 block">Email Address</span>
+                        <span class="font-bold text-slate-800 dark:text-white mt-0.5 block truncate">{{ viewedEmployee.email }}</span>
+                    </div>
+                    <div class="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/50">
+                        <span class="text-[10px] font-bold uppercase text-slate-400 block">Reports To (Manager)</span>
+                        <span class="font-bold text-slate-800 dark:text-white mt-0.5 block">{{ getEmployeeManagerName(viewedEmployee.managerId) }}</span>
+                    </div>
+                    <div class="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/50">
+                        <span class="text-[10px] font-bold uppercase text-slate-400 block">Date Joined</span>
+                        <span class="font-bold text-slate-800 dark:text-white mt-0.5 block">{{ viewedEmployee.joined || '—' }}</span>
+                    </div>
+                    <div class="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/50">
+                        <span class="text-[10px] font-bold uppercase text-slate-400 block">Annual Leave Quota</span>
+                        <span class="font-bold text-blue-600 mt-0.5 block">{{ viewedEmployee.annualLeaveQuota || 18 }} Days</span>
+                    </div>
+                    <div class="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/50">
+                        <span class="text-[10px] font-bold uppercase text-slate-400 block">Used Leave Days</span>
+                        <span class="font-bold text-amber-600 mt-0.5 block">{{ viewedEmployee.usedLeaveDays || 0 }} Days</span>
+                    </div>
+                    <div class="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/50">
+                        <span class="text-[10px] font-bold uppercase text-slate-400 block">Work Shift</span>
+                        <span class="font-bold text-emerald-600 mt-0.5 block">NJ 8 AM - 6 PM (10h)</span>
+                    </div>
+                </div>
+
+                <div>
+                    <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Recent Attendance Logs</h4>
+                    <div class="max-h-36 overflow-y-auto rounded-2xl border border-slate-100 dark:border-slate-800">
+                        <table v-if="viewedEmployeeTimesheets.length" class="w-full text-left text-[11px]">
+                            <thead class="bg-slate-50 dark:bg-slate-800/50 text-slate-400 font-bold uppercase">
+                            <tr><th class="py-2 px-3">Action</th><th class="py-2 px-3">Date/Time</th><th class="py-2 px-3">Status</th></tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+                            <tr v-for="t in viewedEmployeeTimesheets.slice(0, 5)" :key="t.id">
+                                <td class="py-2 px-3 font-bold text-blue-600">{{ t.action }}</td>
+                                <td class="py-2 px-3 text-slate-600 dark:text-slate-300 font-mono">{{ t.date }} {{ t.time }}</td>
+                                <td class="py-2 px-3"><span :class="t.punctuality === 'Late Arrival' ? 'text-rose-500 font-bold' : 'text-emerald-600 font-bold'">{{ t.punctuality || 'On Time' }}</span></td>
+                            </tr>
+                            </tbody>
+                        </table>
+                        <p v-else class="p-4 text-xs text-slate-400 text-center">No attendance logs found.</p>
+                    </div>
+                </div>
+
+                <div>
+                    <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Leave History & Audit</h4>
+                    <div class="max-h-36 overflow-y-auto rounded-2xl border border-slate-100 dark:border-slate-800">
+                        <table v-if="viewedEmployeeLeaves.length" class="w-full text-left text-[11px]">
+                            <thead class="bg-slate-50 dark:bg-slate-800/50 text-slate-400 font-bold uppercase">
+                            <tr><th class="py-2 px-3">Type</th><th class="py-2 px-3">Dates</th><th class="py-2 px-3">Status Audit</th></tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+                            <tr v-for="l in viewedEmployeeLeaves" :key="l.id">
+                                <td class="py-2 px-3 font-bold text-slate-800 dark:text-white">{{ l.type }}</td>
+                                <td class="py-2 px-3 text-slate-600 dark:text-slate-300">{{ formatDateNice(l.from) }} → {{ formatDateNice(l.to) }} ({{ l.days }}d)</td>
+                                <td class="py-2 px-3" v-html="getLeaveAuditBadge(l)"></td>
+                            </tr>
+                            </tbody>
+                        </table>
+                        <p v-else class="p-4 text-xs text-slate-400 text-center">No leave applications found.</p>
+                    </div>
+                </div>
+
+                <div class="pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                    <button v-if="currentRole === 'admin'" @click="modals.viewProfile = false; editEmployee(viewedEmployee.id)" class="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center gap-1.5">
+                        <i class="fa-solid fa-user-pen"></i> Edit Employee Details
+                    </button>
+                    <span v-else></span>
+                    <button @click="modals.viewProfile = false" class="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-600 dark:text-slate-300">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- Application JavaScript Modules -->
+<script src="assets/js/config.js"></script>
+<script src="assets/js/api.js"></script>
+<script src="assets/js/charts.js"></script>
+<script src="assets/js/app.js"></script>
+</body>
+</html>
