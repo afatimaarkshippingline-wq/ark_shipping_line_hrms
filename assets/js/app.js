@@ -26,9 +26,32 @@ const app = createApp({
         const empTab = ref('overview');
         const showNotifDropdown = ref(false);
 
+        // Helper to remove duplicate IDs and exact duplicate submissions
+        function sanitizeLeavesList(list) {
+            if (!Array.isArray(list)) return [];
+            const seenIds = new Set();
+            const seenLeaves = new Set();
+            const result = [];
+            for (const item of list) {
+                if (!item || !item.id) continue;
+                const idStr = String(item.id);
+                if (seenIds.has(idStr)) continue;
+                seenIds.add(idStr);
+
+                // Deduplicate identical submissions for same employee: same empId, type, from, to
+                const contentKey = `${String(item.empId)}|${item.type}|${item.from}|${item.to}`;
+                if (seenLeaves.has(contentKey)) continue;
+                seenLeaves.add(contentKey);
+
+                result.push({ ...item, empId: String(item.empId) });
+            }
+            return result;
+        }
+
         // Core Collections with Local Storage Cache
         const employees = ref(JSON.parse(localStorage.getItem('ark_employees')) || INITIAL_EMPLOYEES.map(e => ({ ...e })));
-        const leaves = ref(JSON.parse(localStorage.getItem('ark_leaves')) || (typeof INITIAL_LEAVES !== 'undefined' ? INITIAL_LEAVES.map(l => ({ ...l })) : []));
+        const initialLeavesRaw = JSON.parse(localStorage.getItem('ark_leaves')) || (typeof INITIAL_LEAVES !== 'undefined' ? INITIAL_LEAVES.map(l => ({ ...l })) : []);
+        const leaves = ref(sanitizeLeavesList(initialLeavesRaw));
         const timesheets = ref(JSON.parse(localStorage.getItem('ark_timesheets')) || (typeof INITIAL_TIMESHEETS !== 'undefined' ? INITIAL_TIMESHEETS.map(t => ({ ...t })) : []));
         const departments = ref(JSON.parse(localStorage.getItem('ark_departments') || '[]'));
         const notifications = ref(JSON.parse(localStorage.getItem('ark_notifications') || '[]'));
@@ -67,6 +90,134 @@ const app = createApp({
         const skeletonLoading = reactive({ employees: false, timesheets: false, leaves: false });
         let toastTimeout = null;
 
+        // Daily Inspirational Quote (Free Quotes API with resilient fallback)
+        const dailyQuote = reactive({
+            text: 'Excellence is not an act, but a habit. We are what we repeatedly do.',
+            author: 'Aristotle',
+            category: 'Excellence',
+            loading: false
+        });
+
+        const FALLBACK_QUOTES = [
+            { text: "Excellence is not an act, but a habit. We are what we repeatedly do.", author: "Aristotle", category: "Excellence" },
+            { text: "Smooth seas do not make skillful sailors. Navigate every challenge with courage.", author: "Franklin D. Roosevelt", category: "Leadership" },
+            { text: "The secret of getting ahead is getting started.", author: "Mark Twain", category: "Motivation" },
+            { text: "Teamwork begins by building trust. And the only way to do that is to overcome our need for invulnerability.", author: "Patrick Lencioni", category: "Teamwork" },
+            { text: "To reach a port we must set sail – Sail, not tie at anchor; Sail, not drift.", author: "Oliver Wendell Holmes", category: "Maritime" },
+            { text: "Quality is not an act, it is a habit. Precision in every shipment, honor in every commitment.", author: "ARK Shipping Creed", category: "Values" },
+            { text: "The future depends on what you do today. Dedication turns small efforts into grand voyages.", author: "Mahatma Gandhi", category: "Inspiration" },
+            { text: "Individually, we are one drop. Together, we are an ocean.", author: "Ryunosuke Satoro", category: "Collaboration" },
+            { text: "Success is the sum of small efforts, repeated day in and day out.", author: "Robert Collier", category: "Consistency" },
+            { text: "Discipline is the bridge between goals and accomplishment.", author: "Jim Rohn", category: "Discipline" },
+            { text: "It is not the ship so much as the skillful sailing that assures the prosperous voyage.", author: "George William Curtis", category: "Maritime" },
+            { text: "Opportunities don't happen, you create them through hard work and integrity.", author: "Chris Grosser", category: "Opportunity" }
+        ];
+
+        async function fetchDailyQuote(forceFresh = false) {
+            dailyQuote.loading = true;
+            try {
+                const res = await fetch('https://dummyjson.com/quotes/random?_=' + Date.now());
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data && data.quote) {
+                        dailyQuote.text = data.quote;
+                        dailyQuote.author = data.author || 'Inspirational';
+                        dailyQuote.category = 'Daily Wisdom';
+                        dailyQuote.loading = false;
+                        return;
+                    }
+                }
+            } catch (e) {}
+            const picked = FALLBACK_QUOTES[Math.floor(Math.random() * FALLBACK_QUOTES.length)];
+            dailyQuote.text = picked.text;
+            dailyQuote.author = picked.author;
+            dailyQuote.category = picked.category;
+            dailyQuote.loading = false;
+        }
+
+        // Scoped User Shift & Attendance State Management
+        function resetShiftSession() {
+            shiftSession.checkInTime = '';
+            shiftSession.checkOutTime = '';
+            shiftSession.breakMinutes = 0;
+            shiftSession.workingMinutes = 0;
+            shiftSession.workingSeconds = 0;
+            shiftSession.breakSeconds = 0;
+            shiftSession.isCompleted = false;
+            shiftSession.punctuality = 'On Time';
+            employeeAttendanceState.value = 'out';
+            Object.keys(punchLog).forEach(k => delete punchLog[k]);
+        }
+
+        function initEmployeeWeeklyCheckins(empKey) {
+            const emp = employees.value.find(e => String(e.id) === String(empKey));
+            const name = emp ? emp.name : 'Employee';
+            mockWeeklyCheckIns.value = [
+                { date: '2026-09-28', empName: name, checkIn: '08:15 AM', checkOut: '06:15 PM', breakDeducted: '00h 20m', completed: '09h 40m', status: 'Completed', onTime: true },
+                { date: '2026-09-25', empName: name, checkIn: '08:22 AM', checkOut: '06:20 PM', breakDeducted: '00h 25m', completed: '09h 33m', status: 'Completed', onTime: true },
+                { date: '2026-09-24', empName: name, checkIn: '08:10 AM', checkOut: '06:10 PM', breakDeducted: '00h 15m', completed: '09h 45m', status: 'Completed', onTime: true },
+                { date: '2026-09-23', empName: name, checkIn: '08:42 AM', checkOut: '06:30 PM', breakDeducted: '00h 20m', completed: '09h 28m', status: 'Late Arrival', onTime: false },
+                { date: '2026-09-22', empName: name, checkIn: '08:05 AM', checkOut: '06:05 PM', breakDeducted: '00h 20m', completed: '09h 40m', status: 'Completed', onTime: true }
+            ];
+            localStorage.setItem('ark_emp_weekly_checkins_' + empKey, JSON.stringify(mockWeeklyCheckIns.value));
+        }
+
+        function loadUserShiftState(empId) {
+            if (!empId) {
+                resetShiftSession();
+                return;
+            }
+            const empKey = String(empId);
+            const savedShift = localStorage.getItem('ark_emp_shift_' + empKey);
+            const savedPunch = localStorage.getItem('ark_emp_punch_log_' + empKey);
+
+            if (savedShift) {
+                try {
+                    Object.assign(shiftSession, JSON.parse(savedShift));
+                } catch (e) { resetShiftSession(); }
+            } else {
+                resetShiftSession();
+            }
+
+            if (savedPunch) {
+                try {
+                    const parsed = JSON.parse(savedPunch);
+                    Object.keys(punchLog).forEach(k => delete punchLog[k]);
+                    Object.assign(punchLog, parsed);
+                } catch (e) {
+                    Object.keys(punchLog).forEach(k => delete punchLog[k]);
+                }
+            } else {
+                Object.keys(punchLog).forEach(k => delete punchLog[k]);
+            }
+
+            // Sync attendance state from today's timesheet entries if any
+            const todayNJ = getNJDateString();
+            const todayLogs = timesheets.value.filter(t => String(t.empId) === empKey && (t.date === todayNJ || String(t.date).includes(todayNJ)));
+            if (todayLogs.length > 0) {
+                const latest = todayLogs[0];
+                if (latest.action === 'Check In' || latest.action === 'Return Back') {
+                    employeeAttendanceState.value = 'working';
+                } else if (latest.action === 'Break') {
+                    employeeAttendanceState.value = 'break';
+                } else if (latest.action === 'Step Away') {
+                    employeeAttendanceState.value = 'away';
+                } else if (latest.action === 'Check Out') {
+                    employeeAttendanceState.value = 'checkedOut';
+                }
+            } else if (!shiftSession.checkInTime) {
+                employeeAttendanceState.value = 'out';
+            }
+
+            // Scoped weekly checkins
+            const savedWeekly = localStorage.getItem('ark_emp_weekly_checkins_' + empKey);
+            if (savedWeekly) {
+                try { mockWeeklyCheckIns.value = JSON.parse(savedWeekly); } catch (e) { initEmployeeWeeklyCheckins(empKey); }
+            } else {
+                initEmployeeWeeklyCheckins(empKey);
+            }
+        }
+
         // Modals State
         const modals = reactive({
             employee: false,
@@ -93,7 +244,7 @@ const app = createApp({
         function persistState() {
             try {
                 localStorage.setItem('ark_employees', JSON.stringify(employees.value));
-                localStorage.setItem('ark_leaves', JSON.stringify(leaves.value));
+                localStorage.setItem('ark_leaves', JSON.stringify(sanitizeLeavesList(leaves.value)));
                 localStorage.setItem('ark_timesheets', JSON.stringify(timesheets.value));
                 localStorage.setItem('ark_departments', JSON.stringify(departments.value));
                 localStorage.setItem('ark_notifications', JSON.stringify(notifications.value));
@@ -202,8 +353,9 @@ const app = createApp({
 
                 if (Array.isArray(d.leaves)) {
                     const remoteLeaves = d.leaves.map(l => ({ ...l, empId: String(l.empId) }));
-                    const localOnly = leaves.value.filter(l => String(l.id).startsWith('LV-LOCAL-'));
-                    leaves.value = [...localOnly, ...remoteLeaves];
+                    const remoteIds = new Set(remoteLeaves.map(l => String(l.id)));
+                    const localOnly = leaves.value.filter(l => String(l.id).startsWith('LV-LOCAL-') && !remoteIds.has(String(l.id)));
+                    leaves.value = sanitizeLeavesList([...localOnly, ...remoteLeaves]);
                 }
 
                 if (Array.isArray(d.attendance)) {
@@ -212,8 +364,19 @@ const app = createApp({
                         action: a.action || '', time: a.time || '', date: a.date || '',
                         totalHours: a.totalHours || '', punctuality: a.punctuality || 'On Time'
                     }));
-                    const localOnly = timesheets.value.filter(t => String(t.id).startsWith('TS-LOCAL-'));
-                    timesheets.value = [...localOnly, ...remoteTs];
+                    const remoteIds = new Set(remoteTs.map(t => String(t.id)));
+                    const localOnly = timesheets.value.filter(t => String(t.id).startsWith('TS-LOCAL-') && !remoteIds.has(String(t.id)));
+                    const merged = [...localOnly, ...remoteTs];
+                    const seen = new Set();
+                    const cleanTs = [];
+                    for (const t of merged) {
+                        const k = String(t.id);
+                        if (!seen.has(k)) {
+                            seen.add(k);
+                            cleanTs.push(t);
+                        }
+                    }
+                    timesheets.value = cleanTs;
                 }
 
                 if (Array.isArray(d.departments) && d.departments.length) {
@@ -281,24 +444,53 @@ const app = createApp({
             onLoginSuccess();
         }
 
-        function onLoginSuccess() {
-            showToast(`Welcome back, ${currentUser.value.name}!`, 'success');
+        async function onLoginSuccess() {
+            // Fresh tab start
+            adminTab.value = 'overview';
+            empTab.value = 'overview';
+            viewedEmployeeId.value = null;
+            showNotifDropdown.value = false;
             loginForm.empId = '';
             loginForm.password = '';
-            syncFromSupabase(true); // silent background sync
+
+            // Load user-scoped shift, punch, and weekly state
+            loadUserShiftState(currentUser.value ? currentUser.value.id : null);
+            showToast(`Welcome back, ${currentUser.value.name}!`, 'success');
+
+            // Turn on skeletons while fetching fresh live data
+            skeletonLoading.employees = true;
+            skeletonLoading.timesheets = true;
+            skeletonLoading.leaves = true;
+
+            try {
+                await syncFromSupabase(true);
+            } finally {
+                skeletonLoading.employees = false;
+                skeletonLoading.timesheets = false;
+                skeletonLoading.leaves = false;
+            }
+
+            fetchDailyQuote();
             nextTick(() => {
                 if (currentRole.value === 'admin') renderAllCharts();
             });
         }
 
-        function setDemoLogin(id, pass) {
-            loginForm.empId = id;
-            loginForm.password = pass;
-            handleLogin();
-        }
-
         function logout() {
             currentUser.value = null;
+            adminTab.value = 'overview';
+            empTab.value = 'overview';
+            viewedEmployeeId.value = null;
+            showNotifDropdown.value = false;
+            modals.employee = false;
+            modals.applyLeave = false;
+            modals.department = false;
+            modals.avatar = false;
+            modals.editProfile = false;
+            modals.viewProfile = false;
+            resetShiftSession();
+            loginForm.empId = '';
+            loginForm.password = '';
             localStorage.removeItem('ark_session');
             sessionStorage.clear();
             showToast('Signed out successfully', 'info');
@@ -375,16 +567,95 @@ const app = createApp({
         }
 
         const adminPendingLeavesCount = computed(() => {
-            return leaves.value.filter(l => canAdminDecideLeave(l)).length;
+            const list = leaves.value.filter(l => canAdminDecideLeave(l));
+            const seen = new Set();
+            for (const l of list) {
+                seen.add(String(l.empId));
+            }
+            return seen.size;
         });
 
+        // Overview widget: exactly 1 pending leave per employee
         const pendingLeavesOverview = computed(() => {
-            return leaves.value.filter(l => l.status === 'Pending' || l.status === 'ManagerApproved').slice(0, 5);
+            const list = leaves.value.filter(l => l.status === 'Pending' || l.status === 'ManagerApproved');
+            // Prioritize leaves ready for admin decision, then most recent date
+            list.sort((a, b) => {
+                const aAdmin = canAdminDecideLeave(a) ? 1 : 0;
+                const bAdmin = canAdminDecideLeave(b) ? 1 : 0;
+                if (bAdmin !== aAdmin) return bAdmin - aAdmin;
+                const timeA = new Date(a.createdAt || a.from || 0).getTime();
+                const timeB = new Date(b.createdAt || b.from || 0).getTime();
+                return timeB - timeA;
+            });
+            const seen = new Set();
+            const result = [];
+            for (const l of list) {
+                const empKey = String(l.empId);
+                if (!seen.has(empKey)) {
+                    seen.add(empKey);
+                    result.push(l);
+                }
+            }
+            return result.slice(0, 5);
         });
 
+        // Leaves & Approvals Queue Table: exactly 1 leave per employee
         const filteredAdminLeaves = computed(() => {
-            if (leaveFilterStatus.value === 'All') return leaves.value;
-            return leaves.value.filter(l => l.status === leaveFilterStatus.value);
+            let pool = leaves.value;
+            if (leaveFilterStatus.value !== 'All') {
+                pool = pool.filter(l => l.status === leaveFilterStatus.value);
+            }
+            // Sort to prioritize pending admin approvals first, then manager approvals, then most recent date
+            const sorted = [...pool].sort((a, b) => {
+                const getWeight = (l) => {
+                    if (canAdminDecideLeave(l)) return 4;
+                    if (l.status === 'ManagerApproved') return 3;
+                    if (l.status === 'Pending') return 2;
+                    return 1;
+                };
+                const diff = getWeight(b) - getWeight(a);
+                if (diff !== 0) return diff;
+                const timeA = new Date(a.createdAt || a.from || 0).getTime();
+                const timeB = new Date(b.createdAt || b.from || 0).getTime();
+                return timeB - timeA;
+            });
+
+            // Ensure only 1 leave per employee is shown in the approval queue
+            const seenEmp = new Set();
+            const result = [];
+            for (const lv of sorted) {
+                const empKey = String(lv.empId);
+                if (!seenEmp.has(empKey)) {
+                    seenEmp.add(empKey);
+                    result.push(lv);
+                }
+            }
+            return result;
+        });
+
+        // Unique employee counts for Leaves tab stats
+        const adminStatsAwaitingAdmin = computed(() => {
+            const seen = new Set();
+            leaves.value.filter(l => canAdminDecideLeave(l)).forEach(l => seen.add(String(l.empId)));
+            return seen.size;
+        });
+
+        const adminStatsAwaitingMgr = computed(() => {
+            const seen = new Set();
+            leaves.value.filter(l => l.status === 'Pending' && !canAdminDecideLeave(l)).forEach(l => seen.add(String(l.empId)));
+            return seen.size;
+        });
+
+        const adminStatsApproved = computed(() => {
+            const seen = new Set();
+            leaves.value.filter(l => l.status === 'Approved').forEach(l => seen.add(String(l.empId)));
+            return seen.size;
+        });
+
+        const adminStatsRejected = computed(() => {
+            const seen = new Set();
+            leaves.value.filter(l => l.status === 'Rejected').forEach(l => seen.add(String(l.empId)));
+            return seen.size;
         });
 
         const mySubmittedLeaves = computed(() => {
@@ -426,7 +697,7 @@ const app = createApp({
             const myDept = myEmp?.dept || currentUser.value.dept;
             const subIds = new Set(userSubordinates.value.map(s => String(s.id)));
 
-            return leaves.value.filter(l => {
+            const raw = leaves.value.filter(l => {
                 // Never show manager's own leave requests in subordinate queue
                 if (String(l.empId) === myId) return false;
                 // Direct match by managerId
@@ -445,6 +716,25 @@ const app = createApp({
                 }
                 return false;
             });
+
+            // 1 leave per subordinate (Pending prioritized, then latest date)
+            raw.sort((a, b) => {
+                if (a.status === 'Pending' && b.status !== 'Pending') return -1;
+                if (b.status === 'Pending' && a.status !== 'Pending') return 1;
+                const timeA = new Date(a.createdAt || a.from || 0).getTime();
+                const timeB = new Date(b.createdAt || b.from || 0).getTime();
+                return timeB - timeA;
+            });
+            const seen = new Set();
+            const result = [];
+            for (const l of raw) {
+                const empKey = String(l.empId);
+                if (!seen.has(empKey)) {
+                    seen.add(empKey);
+                    result.push(l);
+                }
+            }
+            return result;
         });
 
         const managerSubordinatePendingCount = computed(() => {
@@ -718,6 +1008,19 @@ const app = createApp({
                         emp.usedLeaveDays = Number(emp.usedLeaveDays || 0) + Number(leave.days || 0);
                     }
                 }
+
+                // Synchronize any duplicate sibling leaves for this employee
+                leaves.value.forEach(other => {
+                    if (String(other.id) !== String(leaveId) && String(other.empId) === String(leave.empId) && other.from === leave.from && other.to === leave.to) {
+                        other.status = decision;
+                        other.adminDecision = decision;
+                        other.adminNote = note;
+                        other.adminName = leave.adminName;
+                        other.adminId = leave.adminId;
+                        other.adminAt = leave.adminAt;
+                    }
+                });
+
                 persistState();
 
                 addNotification(`Your ${leave.type} request was ${decision} by Admin.${note ? ' Note: ' + note : ''}`, leave.empId, decision === 'Approved' ? 'fa-circle-check' : 'fa-circle-xmark');
@@ -744,6 +1047,19 @@ const app = createApp({
                 leave.managerId = currentUser.value ? String(currentUser.value.id) : leave.managerId;
                 leave.managerNote = note;
                 leave.managerAt = new Date().toISOString();
+
+                // Synchronize any duplicate sibling leaves for this employee
+                leaves.value.forEach(other => {
+                    if (String(other.id) !== String(leaveId) && String(other.empId) === String(leave.empId) && other.from === leave.from && other.to === leave.to) {
+                        other.status = leave.status;
+                        other.managerDecision = decision;
+                        other.managerNote = note;
+                        other.managerName = leave.managerName;
+                        other.managerId = leave.managerId;
+                        other.managerAt = leave.managerAt;
+                    }
+                });
+
                 persistState();
 
                 const mgrName = currentUser.value ? currentUser.value.name : 'Manager';
@@ -1046,6 +1362,9 @@ const app = createApp({
                     employeeAttendanceState.value = 'checkedOut';
                 }
 
+                const myEmpId = currentUser.value ? String(currentUser.value.id) : 'guest';
+                localStorage.setItem('ark_emp_punch_log_' + myEmpId, JSON.stringify(punchLog));
+                localStorage.setItem('ark_emp_shift_' + myEmpId, JSON.stringify(shiftSession));
                 localStorage.setItem('ark_emp_punch_log', JSON.stringify(punchLog));
                 localStorage.setItem('ark_emp_shift', JSON.stringify(shiftSession));
 
@@ -1064,6 +1383,7 @@ const app = createApp({
                 if (action === 'Check Out') {
                     const todayRecord = {
                         date: `Today (${dateStr.slice(5)})`,
+                        empName: currentUser.value ? currentUser.value.name : 'Employee',
                         checkIn: shiftSession.checkInTime || '—',
                         checkOut: timeStr,
                         breakDeducted: formatSecondsHms(shiftSession.breakSeconds || 0),
@@ -1075,6 +1395,7 @@ const app = createApp({
                     const idx = mockWeeklyCheckIns.value.findIndex(i => i.date.includes('Today'));
                     if (idx !== -1) mockWeeklyCheckIns.value[idx] = todayRecord;
                     else mockWeeklyCheckIns.value.unshift(todayRecord);
+                    localStorage.setItem('ark_emp_weekly_checkins_' + myEmpId, JSON.stringify(mockWeeklyCheckIns.value));
                     localStorage.setItem('ark_emp_weekly_checkins', JSON.stringify(mockWeeklyCheckIns.value));
                 }
 
@@ -1134,42 +1455,490 @@ const app = createApp({
             downloadCSVFile(csv, "ARK_Roster.csv");
         }
 
-        // ── Monthly Reports ──────────────────────────────────────────────────
-        const selectedReportMonth = ref(() => {
-            const d = new Date();
-            return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`;
-        });
-        // Initialize as plain string:
+        // ── Enterprise PDF Reports ─────────────────────────────────────────────
         const reportMonth = ref((() => { const d = new Date(); return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`; })());
+        const reportDossierEmpId = ref('');
 
-        function exportMonthlyLeavesCSV() {
-            const [yr, mo] = reportMonth.value.split('-').map(Number);
-            const filtered = leaves.value.filter(l => {
-                if (!l.from) return false;
-                const d = new Date(l.from);
-                return d.getFullYear() === yr && (d.getMonth() + 1) === mo;
-            });
-            let csv = "Employee,ID,Leave Type,From,To,Days,Status,Manager Decision,Admin Decision,Reason\n";
-            filtered.forEach(l => {
-                csv += `"${l.empName}","${l.empId}","${l.type}","${l.from}","${l.to}","${l.days || ''}","${l.status}","${l.managerDecision || ''}","${l.adminDecision || ''}","${(l.reason || '').replace(/"/g, "'")}"\n`;
-            });
-            const moLabel = new Date(yr, mo - 1, 1).toLocaleString('en-US', { month: 'long', year: 'numeric' });
-            downloadCSVFile(csv, `ARK_Leaves_Report_${moLabel.replace(' ', '_')}.csv`);
+        function exportAttendancePDF() {
+            showLoading('Generating Workforce Attendance PDF...');
+            setTimeout(() => {
+                try {
+                    const { jsPDF } = window.jspdf || {};
+                    if (!jsPDF) {
+                        hideLoading();
+                        showToast('PDF generator is initializing. Please retry.', 'info');
+                        return;
+                    }
+                    const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+                    const [yr, mo] = reportMonth.value.split('-').map(Number);
+                    const moLabel = new Date(yr, mo - 1, 1).toLocaleString('en-US', { month: 'long', year: 'numeric' });
+
+                    const filtered = timesheets.value.filter(t => {
+                        if (!t.date) return false;
+                        const d = new Date(t.date);
+                        return d.getFullYear() === yr && (d.getMonth() + 1) === mo;
+                    });
+                    const targetList = filtered.length ? filtered : timesheets.value;
+                    const totalLogs = targetList.length;
+                    const onTimeCount = targetList.filter(t => t.punctuality !== 'Late Arrival').length;
+                    const lateCount = targetList.filter(t => t.punctuality === 'Late Arrival').length;
+                    const onTimePct = totalLogs > 0 ? Math.round((onTimeCount / totalLogs) * 100) : 100;
+
+                    // Brand Navy Header
+                    doc.setFillColor(12, 26, 75);
+                    doc.rect(0, 0, 842, 60, 'F');
+
+                    doc.setTextColor(255, 255, 255);
+                    doc.setFont('helvetica', 'bold');
+                    doc.setFontSize(16);
+                    doc.text('ARK SHIPPING LINE', 32, 28);
+
+                    doc.setFont('helvetica', 'normal');
+                    doc.setFontSize(9);
+                    doc.setTextColor(197, 220, 254);
+                    doc.text('HUMAN RESOURCES MANAGEMENT SYSTEM · EXECUTIVE WORKFORCE AUDIT', 32, 45);
+
+                    doc.setTextColor(255, 255, 255);
+                    doc.setFontSize(10);
+                    doc.setFont('helvetica', 'bold');
+                    doc.text(`PERIOD: ${moLabel.toUpperCase()}`, 810, 36, { align: 'right' });
+
+                    // Section Heading
+                    doc.setTextColor(30, 41, 59);
+                    doc.setFontSize(13);
+                    doc.setFont('helvetica', 'bold');
+                    doc.text('Monthly Shift Performance & Punctuality Record', 32, 86);
+
+                    doc.setFontSize(8.5);
+                    doc.setFont('helvetica', 'normal');
+                    doc.setTextColor(100, 116, 139);
+                    doc.text(`Generated: ${new Date().toLocaleString()} (NJ Time) · Certified by: ${currentUser.value ? currentUser.value.name : 'Super Administrator'} · ARK HR Compliance`, 32, 100);
+
+                    // 4 KPI Summary Cards
+                    const drawCard = (x, y, w, h, title, val, color) => {
+                        doc.setFillColor(248, 250, 252);
+                        doc.setDrawColor(226, 232, 240);
+                        doc.roundedRect(x, y, w, h, 6, 6, 'FD');
+                        doc.setFontSize(7.5);
+                        doc.setFont('helvetica', 'bold');
+                        doc.setTextColor(100, 116, 139);
+                        doc.text(title.toUpperCase(), x + 10, y + 16);
+                        doc.setFontSize(13);
+                        doc.setTextColor(...color);
+                        doc.text(String(val), x + 10, y + 36);
+                    };
+
+                    drawCard(32, 112, 178, 46, 'Total Events Recorded', totalLogs, [37, 99, 235]);
+                    drawCard(224, 112, 178, 46, 'Punctuality Compliance', `${onTimePct}%`, [16, 185, 129]);
+                    drawCard(416, 112, 178, 46, 'Late Arrivals Recorded', lateCount, [225, 29, 72]);
+                    drawCard(608, 112, 202, 46, 'Active Headcount', `${employees.value.length} Staff Members`, [124, 58, 237]);
+
+                    // Attendance Rows
+                    const rows = targetList.map(t => [
+                        t.date || '—',
+                        t.empId || '—',
+                        t.empName || '—',
+                        t.dept || (employees.value.find(e => String(e.id) === String(t.empId))?.dept) || 'Operations',
+                        t.action || 'Shift Event',
+                        t.time || '—',
+                        t.totalHours || '09h 45m',
+                        t.punctuality || 'On Time'
+                    ]);
+
+                    doc.autoTable({
+                        startY: 170,
+                        head: [['Date', 'Emp ID', 'Employee Name', 'Department', 'Logged Action', 'Time', 'Shift Hours', 'Punctuality']],
+                        body: rows,
+                        theme: 'striped',
+                        headStyles: { fillColor: [12, 26, 75], textColor: 255, fontStyle: 'bold', fontSize: 8.5 },
+                        styles: { font: 'helvetica', fontSize: 8, cellPadding: 4, textColor: [30, 41, 59] },
+                        alternateRowStyles: { fillColor: [248, 250, 252] },
+                        columnStyles: { 7: { fontStyle: 'bold' } },
+                        didParseCell: function(data) {
+                            if (data.section === 'body' && data.column.index === 7) {
+                                if (data.cell.raw === 'Late Arrival') data.cell.styles.textColor = [225, 29, 72];
+                                else data.cell.styles.textColor = [16, 185, 129];
+                            }
+                        },
+                        margin: { left: 32, right: 32 }
+                    });
+
+                    // Footers on all pages
+                    const pageCount = doc.internal.getNumberOfPages();
+                    for (let i = 1; i <= pageCount; i++) {
+                        doc.setPage(i);
+                        doc.setDrawColor(226, 232, 240);
+                        doc.line(32, 560, 810, 560);
+                        doc.setFontSize(7.5);
+                        doc.setFont('helvetica', 'normal');
+                        doc.setTextColor(148, 163, 184);
+                        doc.text('ARK SHIPPING LINE · CONFIDENTIAL HRMS ENTERPRISE RECORD · CERTIFIED INTERNAL AUDIT', 32, 574);
+                        doc.text(`Page ${i} of ${pageCount}`, 810, 574, { align: 'right' });
+                    }
+
+                    doc.save(`ARK_Attendance_Report_${moLabel.replace(/\s+/g, '_')}.pdf`);
+                    showToast('Workforce Attendance PDF exported successfully!', 'success');
+                } catch (err) {
+                    console.error('[exportAttendancePDF]', err);
+                    showToast('PDF Export Error: ' + err.message, 'error');
+                } finally {
+                    hideLoading();
+                }
+            }, 300);
         }
 
-        function exportMonthlyHoursCSV() {
-            const [yr, mo] = reportMonth.value.split('-').map(Number);
-            const filtered = timesheets.value.filter(t => {
-                if (!t.date) return false;
-                const d = new Date(t.date);
-                return d.getFullYear() === yr && (d.getMonth() + 1) === mo;
-            });
-            let csv = "Employee,ID,Action,Time,Date,Net Hours,Break Deducted,Audit Note,Punctuality\n";
-            filtered.forEach(t => {
-                csv += `"${t.empName}","${t.empId}","${t.action}","${t.time}","${t.date}","${t.totalHours}","${t.breakDeducted || ''}","${t.auditNote || ''}","${t.punctuality}"\n`;
-            });
-            const moLabel = new Date(yr, mo - 1, 1).toLocaleString('en-US', { month: 'long', year: 'numeric' });
-            downloadCSVFile(csv, `ARK_Hours_Report_${moLabel.replace(' ', '_')}.csv`);
+        function exportLeavesPDF() {
+            showLoading('Generating Leaves & Approvals Audit PDF...');
+            setTimeout(() => {
+                try {
+                    const { jsPDF } = window.jspdf || {};
+                    if (!jsPDF) {
+                        hideLoading();
+                        showToast('PDF generator is initializing. Please retry.', 'info');
+                        return;
+                    }
+                    const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+                    const [yr, mo] = reportMonth.value.split('-').map(Number);
+                    const moLabel = new Date(yr, mo - 1, 1).toLocaleString('en-US', { month: 'long', year: 'numeric' });
+
+                    const totalReqs = leaves.value.length;
+                    const approvedCount = leaves.value.filter(l => l.status === 'Approved').length;
+                    const pendingCount = leaves.value.filter(l => l.status === 'Pending' || l.status === 'ManagerApproved').length;
+                    const rejectedCount = leaves.value.filter(l => l.status === 'Rejected').length;
+
+                    // Brand Navy Header
+                    doc.setFillColor(12, 26, 75);
+                    doc.rect(0, 0, 842, 60, 'F');
+
+                    doc.setTextColor(255, 255, 255);
+                    doc.setFont('helvetica', 'bold');
+                    doc.setFontSize(16);
+                    doc.text('ARK SHIPPING LINE', 32, 28);
+
+                    doc.setFont('helvetica', 'normal');
+                    doc.setFontSize(9);
+                    doc.setTextColor(197, 220, 254);
+                    doc.text('HUMAN RESOURCES MANAGEMENT SYSTEM · LEAVE GOVERNANCE & APPROVALS AUDIT', 32, 45);
+
+                    doc.setTextColor(255, 255, 255);
+                    doc.setFontSize(10);
+                    doc.setFont('helvetica', 'bold');
+                    doc.text(`PERIOD: ${moLabel.toUpperCase()}`, 810, 36, { align: 'right' });
+
+                    // Section Heading
+                    doc.setTextColor(30, 41, 59);
+                    doc.setFontSize(13);
+                    doc.setFont('helvetica', 'bold');
+                    doc.text('Leave Requests, Multi-Level Workflow & Decisions Dossier', 32, 86);
+
+                    doc.setFontSize(8.5);
+                    doc.setFont('helvetica', 'normal');
+                    doc.setTextColor(100, 116, 139);
+                    doc.text(`Generated: ${new Date().toLocaleString()} (NJ Time) · Authorized: ${currentUser.value ? currentUser.value.name : 'Super Administrator'}`, 32, 100);
+
+                    // Summary KPI Cards
+                    const drawCard = (x, y, w, h, title, val, color) => {
+                        doc.setFillColor(248, 250, 252);
+                        doc.setDrawColor(226, 232, 240);
+                        doc.roundedRect(x, y, w, h, 6, 6, 'FD');
+                        doc.setFontSize(7.5);
+                        doc.setFont('helvetica', 'bold');
+                        doc.setTextColor(100, 116, 139);
+                        doc.text(title.toUpperCase(), x + 10, y + 16);
+                        doc.setFontSize(13);
+                        doc.setTextColor(...color);
+                        doc.text(String(val), x + 10, y + 36);
+                    };
+
+                    drawCard(32, 112, 178, 46, 'Total Leave Requests', totalReqs, [37, 99, 235]);
+                    drawCard(224, 112, 178, 46, 'Fully Approved', approvedCount, [16, 185, 129]);
+                    drawCard(416, 112, 178, 46, 'In Approval Queue', pendingCount, [245, 158, 11]);
+                    drawCard(608, 112, 202, 46, 'Rejected Requests', rejectedCount, [225, 29, 72]);
+
+                    const rows = leaves.value.map(l => [
+                        l.id || '—',
+                        l.empId || '—',
+                        l.empName || '—',
+                        l.type || 'Annual',
+                        `${formatDateNice(l.from)} → ${formatDateNice(l.to)}`,
+                        `${l.days} d`,
+                        (l.reason || '—').slice(0, 35),
+                        l.managerDecision ? `${l.managerDecision} (${l.managerName || 'Mgr'})` : 'Awaiting Review',
+                        l.adminDecision ? `${l.adminDecision} (${l.adminName || 'Admin'})` : (l.status === 'ManagerApproved' ? 'Pending Final Admin' : 'Pending'),
+                        l.status || 'Pending'
+                    ]);
+
+                    doc.autoTable({
+                        startY: 170,
+                        head: [['Req ID', 'ID', 'Employee', 'Type', 'Period', 'Days', 'Reason', '1st Level (Mgr)', '2nd Level (Admin)', 'Status']],
+                        body: rows,
+                        theme: 'striped',
+                        headStyles: { fillColor: [12, 26, 75], textColor: 255, fontStyle: 'bold', fontSize: 8 },
+                        styles: { font: 'helvetica', fontSize: 7.5, cellPadding: 3.5, textColor: [30, 41, 59] },
+                        alternateRowStyles: { fillColor: [248, 250, 252] },
+                        columnStyles: { 9: { fontStyle: 'bold' } },
+                        didParseCell: function(data) {
+                            if (data.section === 'body' && data.column.index === 9) {
+                                if (data.cell.raw === 'Approved') data.cell.styles.textColor = [16, 185, 129];
+                                else if (data.cell.raw === 'Rejected') data.cell.styles.textColor = [225, 29, 72];
+                                else data.cell.styles.textColor = [217, 119, 6];
+                            }
+                        },
+                        margin: { left: 32, right: 32 }
+                    });
+
+                    const pageCount = doc.internal.getNumberOfPages();
+                    for (let i = 1; i <= pageCount; i++) {
+                        doc.setPage(i);
+                        doc.setDrawColor(226, 232, 240);
+                        doc.line(32, 560, 810, 560);
+                        doc.setFontSize(7.5);
+                        doc.setFont('helvetica', 'normal');
+                        doc.setTextColor(148, 163, 184);
+                        doc.text('ARK SHIPPING LINE · CONFIDENTIAL HRMS ENTERPRISE RECORD · CERTIFIED INTERNAL AUDIT', 32, 574);
+                        doc.text(`Page ${i} of ${pageCount}`, 810, 574, { align: 'right' });
+                    }
+
+                    doc.save(`ARK_Leaves_Audit_Report_${moLabel.replace(/\s+/g, '_')}.pdf`);
+                    showToast('Leaves Audit PDF exported successfully!', 'success');
+                } catch (err) {
+                    console.error('[exportLeavesPDF]', err);
+                    showToast('PDF Export Error: ' + err.message, 'error');
+                } finally {
+                    hideLoading();
+                }
+            }, 300);
+        }
+
+        function exportRosterPDF() {
+            showLoading('Generating Workforce Roster PDF...');
+            setTimeout(() => {
+                try {
+                    const { jsPDF } = window.jspdf || {};
+                    if (!jsPDF) {
+                        hideLoading();
+                        showToast('PDF generator is initializing. Please retry.', 'info');
+                        return;
+                    }
+                    const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
+
+                    // Brand Navy Header
+                    doc.setFillColor(12, 26, 75);
+                    doc.rect(0, 0, 595, 60, 'F');
+
+                    doc.setTextColor(255, 255, 255);
+                    doc.setFont('helvetica', 'bold');
+                    doc.setFontSize(15);
+                    doc.text('ARK SHIPPING LINE', 32, 28);
+
+                    doc.setFont('helvetica', 'normal');
+                    doc.setFontSize(8.5);
+                    doc.setTextColor(197, 220, 254);
+                    doc.text('OFFICIAL WORKFORCE ROSTER & ORGANIZATIONAL DIRECTORY', 32, 45);
+
+                    doc.setTextColor(255, 255, 255);
+                    doc.setFontSize(9);
+                    doc.setFont('helvetica', 'bold');
+                    doc.text(`${employees.value.length} TOTAL EMPLOYEES`, 563, 36, { align: 'right' });
+
+                    doc.setTextColor(30, 41, 59);
+                    doc.setFontSize(12);
+                    doc.setFont('helvetica', 'bold');
+                    doc.text('Active Personnel & Departmental Hierarchy', 32, 84);
+
+                    doc.setFontSize(8);
+                    doc.setFont('helvetica', 'normal');
+                    doc.setTextColor(100, 116, 139);
+                    doc.text(`Generated: ${new Date().toLocaleString()} (NJ Time) · Super Admin Verified`, 32, 97);
+
+                    const rows = employees.value.map(e => [
+                        e.id || '—',
+                        e.name || '—',
+                        e.dept || 'Operations',
+                        e.role || 'Staff',
+                        e.email || '—',
+                        getEmployeeManagerName(e.id),
+                        e.status || 'Active'
+                    ]);
+
+                    doc.autoTable({
+                        startY: 110,
+                        head: [['ID', 'Full Name', 'Department', 'Job Title', 'Email Address', 'Reports To', 'Status']],
+                        body: rows,
+                        theme: 'striped',
+                        headStyles: { fillColor: [12, 26, 75], textColor: 255, fontStyle: 'bold', fontSize: 8 },
+                        styles: { font: 'helvetica', fontSize: 7.5, cellPadding: 4, textColor: [30, 41, 59] },
+                        alternateRowStyles: { fillColor: [248, 250, 252] },
+                        margin: { left: 32, right: 32 }
+                    });
+
+                    const pageCount = doc.internal.getNumberOfPages();
+                    for (let i = 1; i <= pageCount; i++) {
+                        doc.setPage(i);
+                        doc.setDrawColor(226, 232, 240);
+                        doc.line(32, 800, 563, 800);
+                        doc.setFontSize(7);
+                        doc.setFont('helvetica', 'normal');
+                        doc.setTextColor(148, 163, 184);
+                        doc.text('ARK SHIPPING LINE · CONFIDENTIAL ORGANIZATIONAL DIRECTORY', 32, 814);
+                        doc.text(`Page ${i} of ${pageCount}`, 563, 814, { align: 'right' });
+                    }
+
+                    doc.save('ARK_Workforce_Roster.pdf');
+                    showToast('Workforce Roster PDF exported!', 'success');
+                } catch (err) {
+                    console.error('[exportRosterPDF]', err);
+                    showToast('PDF Export Error: ' + err.message, 'error');
+                } finally {
+                    hideLoading();
+                }
+            }, 300);
+        }
+
+        function exportEmployeeDossierPDF(empId) {
+            if (!empId) {
+                showToast('Please select an employee first', 'info');
+                return;
+            }
+            const emp = employees.value.find(e => String(e.id) === String(empId));
+            if (!emp) {
+                showToast('Employee not found', 'error');
+                return;
+            }
+
+            showLoading(`Generating Dossier for ${emp.name}...`);
+            setTimeout(() => {
+                try {
+                    const { jsPDF } = window.jspdf || {};
+                    if (!jsPDF) {
+                        hideLoading();
+                        showToast('PDF generator is initializing. Please retry.', 'info');
+                        return;
+                    }
+                    const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
+
+                    // Header
+                    doc.setFillColor(12, 26, 75);
+                    doc.rect(0, 0, 595, 60, 'F');
+
+                    doc.setTextColor(255, 255, 255);
+                    doc.setFont('helvetica', 'bold');
+                    doc.setFontSize(15);
+                    doc.text('ARK SHIPPING LINE', 32, 28);
+
+                    doc.setFont('helvetica', 'normal');
+                    doc.setFontSize(8.5);
+                    doc.setTextColor(197, 220, 254);
+                    doc.text('INDIVIDUAL EMPLOYEE PERFORMANCE & ATTENDANCE DOSSIER', 32, 45);
+
+                    doc.setTextColor(255, 255, 255);
+                    doc.setFontSize(9);
+                    doc.setFont('helvetica', 'bold');
+                    doc.text(`EMP ID: ${emp.id}`, 563, 36, { align: 'right' });
+
+                    // Employee Profile Box
+                    doc.setFillColor(248, 250, 252);
+                    doc.setDrawColor(226, 232, 240);
+                    doc.roundedRect(32, 75, 531, 95, 6, 6, 'FD');
+
+                    doc.setFontSize(14);
+                    doc.setFont('helvetica', 'bold');
+                    doc.setTextColor(15, 23, 42);
+                    doc.text(emp.name, 48, 98);
+
+                    doc.setFontSize(8.5);
+                    doc.setFont('helvetica', 'normal');
+                    doc.setTextColor(100, 116, 139);
+                    doc.text(`${emp.role || 'Staff'} · Department of ${emp.dept}`, 48, 112);
+
+                    // Grid details
+                    doc.setFontSize(8);
+                    doc.setTextColor(71, 85, 105);
+                    doc.text(`Official Email: ${emp.email}`, 48, 132);
+                    doc.text(`Reporting Manager: ${getEmployeeManagerName(emp.id)}`, 48, 146);
+                    doc.text(`Date of Joining: ${emp.joined || '15 Jan 2024'}`, 48, 160);
+
+                    doc.text(`Status: ${emp.status || 'Active'}`, 330, 132);
+                    doc.text(`Total Leave Days Used: ${emp.usedLeaveDays || 0} days`, 330, 146);
+                    doc.text(`Annual Allocation: 24 days`, 330, 160);
+
+                    // Timesheet records
+                    const empTimesheets = timesheets.value.filter(t => String(t.empId) === String(emp.id));
+                    const empLeaves = leaves.value.filter(l => String(l.empId) === String(emp.id));
+
+                    doc.setFontSize(11);
+                    doc.setFont('helvetica', 'bold');
+                    doc.setTextColor(15, 23, 42);
+                    doc.text('Recent Attendance & Shift Performance', 32, 190);
+
+                    const tsRows = (empTimesheets.length ? empTimesheets : timesheets.value.slice(0, 6)).map(t => [
+                        t.date || '—',
+                        t.action || 'Shift',
+                        t.time || '—',
+                        t.totalHours || '09h 45m',
+                        t.punctuality || 'On Time'
+                    ]);
+
+                    doc.autoTable({
+                        startY: 198,
+                        head: [['Date', 'Action', 'Time', 'Duration Logged', 'Punctuality']],
+                        body: tsRows,
+                        theme: 'striped',
+                        headStyles: { fillColor: [12, 26, 75], textColor: 255, fontStyle: 'bold', fontSize: 8 },
+                        styles: { font: 'helvetica', fontSize: 7.5, cellPadding: 3.5 },
+                        alternateRowStyles: { fillColor: [248, 250, 252] },
+                        margin: { left: 32, right: 32 }
+                    });
+
+                    let nextY = doc.lastAutoTable.finalY + 22;
+                    doc.setFontSize(11);
+                    doc.setFont('helvetica', 'bold');
+                    doc.setTextColor(15, 23, 42);
+                    doc.text('Leave Applications & Approval Audit Trail', 32, nextY);
+
+                    const lvRows = empLeaves.map(l => [
+                        l.id || '—',
+                        l.type || 'Annual',
+                        `${formatDateNice(l.from)} → ${formatDateNice(l.to)}`,
+                        `${l.days}d`,
+                        (l.reason || '—').slice(0, 30),
+                        l.managerDecision ? `${l.managerDecision} (${l.managerName || 'Mgr'})` : '—',
+                        l.status || 'Pending'
+                    ]);
+
+                    doc.autoTable({
+                        startY: nextY + 8,
+                        head: [['Leave ID', 'Type', 'Period', 'Days', 'Reason', 'Manager Action', 'Final Status']],
+                        body: lvRows.length ? lvRows : [['—', 'No recorded leaves', '—', '0', 'None', '—', 'Normal']],
+                        theme: 'striped',
+                        headStyles: { fillColor: [12, 26, 75], textColor: 255, fontStyle: 'bold', fontSize: 8 },
+                        styles: { font: 'helvetica', fontSize: 7.5, cellPadding: 3.5 },
+                        alternateRowStyles: { fillColor: [248, 250, 252] },
+                        margin: { left: 32, right: 32 }
+                    });
+
+                    // Footer
+                    const pageCount = doc.internal.getNumberOfPages();
+                    for (let i = 1; i <= pageCount; i++) {
+                        doc.setPage(i);
+                        doc.setDrawColor(226, 232, 240);
+                        doc.line(32, 800, 563, 800);
+                        doc.setFontSize(7);
+                        doc.setFont('helvetica', 'normal');
+                        doc.setTextColor(148, 163, 184);
+                        doc.text(`ARK SHIPPING LINE · OFFICIAL DOSSIER · EMP: ${emp.name} (${emp.id})`, 32, 814);
+                        doc.text(`Page ${i} of ${pageCount}`, 563, 814, { align: 'right' });
+                    }
+
+                    doc.save(`ARK_Dossier_${emp.name.replace(/\s+/g, '_')}_${emp.id}.pdf`);
+                    showToast(`Dossier PDF generated for ${emp.name}!`, 'success');
+                } catch (err) {
+                    console.error('[exportEmployeeDossierPDF]', err);
+                    showToast('PDF Export Error: ' + err.message, 'error');
+                } finally {
+                    hideLoading();
+                }
+            }, 300);
         }
 
         // ── Monthly Roster & Progress ─────────────────────────────────────────
@@ -1352,21 +2121,44 @@ const app = createApp({
             updateClocks();
             clockTimer = setInterval(updateClocks, 1000);
 
+            // Clean up any duplicates on startup
+            leaves.value = sanitizeLeavesList(leaves.value);
+            persistState();
+
+            // Fetch daily inspirational quote for workforce
+            fetchDailyQuote();
+
             const session = localStorage.getItem('ark_session');
             if (session) {
                 try {
                     currentUser.value = JSON.parse(session);
+                    // Load user's scoped shift and punch state
+                    loadUserShiftState(currentUser.value ? currentUser.value.id : null);
                     syncFromSupabase(true);
                     nextTick(() => { renderAllCharts(); });
                 } catch (e) {
                     localStorage.removeItem('ark_session');
                 }
             }
+
+            // ── Cross-tab session sync ───────────────────────────────────────
+            // If another tab logs in or out, reload this tab to get a clean state
+            window._arkStorageHandler = (e) => {
+                if (e.key === 'ark_session') {
+                    // Session changed in another tab → force a clean reload
+                    window.location.reload();
+                }
+            };
+            window.addEventListener('storage', window._arkStorageHandler);
         });
 
         onUnmounted(() => {
             if (clockTimer) clearInterval(clockTimer);
+            if (window._arkStorageHandler) {
+                window.removeEventListener('storage', window._arkStorageHandler);
+            }
         });
+
 
         return {
             isDarkMode, njClock, currentUser, currentRole, adminTab, empTab, showNotifDropdown,
@@ -1377,18 +2169,21 @@ const app = createApp({
             avatarList: AVATARS,
             departmentList, departmentOverview, filteredEmployees, adminPendingLeavesCount,
             pendingLeavesOverview, filteredAdminLeaves, mySubmittedLeaves, isUserManager,
+            adminStatsAwaitingAdmin, adminStatsAwaitingMgr, adminStatsApproved, adminStatsRejected,
             userSubordinates, userReportingManager, managerSubordinateLeaves, managerSubordinatePendingCount,
             userNotifications, isUserOnApprovedLeave, empActionHint, empStatusPillText, empStatusPillClasses,
             shiftProgress, liveShiftMetrics, viewedEmployee, viewedEmployeeTimesheets, viewedEmployeeLeaves, topPerformers,
             isSubmittingLeave, liveNow, selectedRosterMonth, selectedRosterEmpId, rosterViewMode, availableMonths,
-            monthlyRosterData, rosterEmpOptions, rosterSelectedEmpLeaves, reportMonth,
-            toggleDarkMode, handleLogin, setDemoLogin, logout, switchAdminNav, switchEmpTab,
+            monthlyRosterData, rosterEmpOptions, rosterSelectedEmpLeaves, reportMonth, reportDossierEmpId,
+            dailyQuote, fetchDailyQuote,
+            toggleDarkMode, handleLogin, logout, switchAdminNav, switchEmpTab,
             syncFromSupabase, saveSupabaseCredentials, testSupabaseConnection, downloadJsonBackup, resetWorkspaceData,
             openAddEmployeeModal, editEmployee, saveEmployeeSubmit, deleteEmployeePrompt,
             openEmployeeProfileModal, openAvatarPicker, selectAvatar, openEditProfileModal, saveProfileInfo,
             openAddDepartmentModal, saveDepartmentSubmit, adminFinalDecide, managerDecideLeave,
             openApplyLeaveModal, submitApplyLeave, empPunchAction, isPunchDisabled,
-            exportAttendanceCSV, exportFullDataCSV, exportMonthlyLeavesCSV, exportMonthlyHoursCSV, clearNotifications,
+            exportAttendancePDF, exportLeavesPDF, exportRosterPDF, exportEmployeeDossierPDF,
+            exportAttendanceCSV, exportFullDataCSV, clearNotifications,
             getBadgeClasses, formatDateNice, getLeaveAuditBadge, isManager, getEmployeeManager, getEmployeeManagerName,
             canAdminDecideLeave, formatSecondsHms, formatSecondsPretty, pad2
         };

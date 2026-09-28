@@ -34,6 +34,10 @@
     <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
+    <!-- Enterprise PDF Export Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+
     <!-- Application Stylesheet -->
     <link rel="stylesheet" href="assets/css/style.css">
 </head>
@@ -126,20 +130,12 @@
                 </button>
             </form>
 
-            <!-- Quick Demo Credentials Box -->
+            <!-- Secure Access Notice -->
             <div class="mt-6 pt-5 border-t border-slate-200/80 dark:border-slate-800 text-center relative z-10">
-                <p class="text-[11px] font-bold text-slate-400 mb-2">QUICK DEMO LOGINS</p>
-                <div class="flex items-center justify-center gap-2 flex-wrap text-xs">
-                    <button type="button" @click="setDemoLogin('1', 'admin123')" class="px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 font-bold hover:underline">
-                        👑 Admin (1 / admin123)
-                    </button>
-                    <button type="button" @click="setDemoLogin('101', '123456')" class="px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-300 font-bold hover:underline">
-                        👔 Manager (101 / 123456)
-                    </button>
-                    <button type="button" @click="setDemoLogin('102', '123456')" class="px-2.5 py-1 rounded-lg bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-300 font-bold hover:underline">
-                        💼 Staff (102 / 123456)
-                    </button>
-                </div>
+                <p class="text-[11px] text-slate-400 flex items-center justify-center gap-1.5">
+                    <i class="fa-solid fa-shield-halved text-blue-500"></i>
+                    Authorized personnel only · ARK Shipping Line HRMS
+                </p>
             </div>
         </div>
     </div>
@@ -585,10 +581,10 @@
                 <!-- ADMIN SECTION: LEAVES -->
                 <div v-show="adminTab === 'leaves'" class="space-y-6">
                     <div class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
-                        <div class="p-4 sm:p-5 rounded-2xl glass-card"><p class="text-xs font-bold text-slate-400 uppercase">Awaiting Admin</p><h4 class="text-2xl font-black text-amber-500 font-heading mt-1">{{ leaves.filter(l => canAdminDecideLeave(l)).length }}</h4></div>
-                        <div class="p-4 sm:p-5 rounded-2xl glass-card"><p class="text-xs font-bold text-slate-400 uppercase">Awaiting Mgr</p><h4 class="text-2xl font-black text-blue-600 font-heading mt-1">{{ leaves.filter(l => l.status === 'Pending' && !canAdminDecideLeave(l)).length }}</h4></div>
-                        <div class="p-4 sm:p-5 rounded-2xl glass-card"><p class="text-xs font-bold text-slate-400 uppercase">Approved</p><h4 class="text-2xl font-black text-emerald-600 font-heading mt-1">{{ leaves.filter(l => l.status === 'Approved').length }}</h4></div>
-                        <div class="p-4 sm:p-5 rounded-2xl glass-card"><p class="text-xs font-bold text-slate-400 uppercase">Rejected</p><h4 class="text-2xl font-black text-rose-500 font-heading mt-1">{{ leaves.filter(l => l.status === 'Rejected').length }}</h4></div>
+                        <div class="p-4 sm:p-5 rounded-2xl glass-card"><p class="text-xs font-bold text-slate-400 uppercase">Awaiting Admin</p><h4 class="text-2xl font-black text-amber-500 font-heading mt-1">{{ adminStatsAwaitingAdmin }}</h4></div>
+                        <div class="p-4 sm:p-5 rounded-2xl glass-card"><p class="text-xs font-bold text-slate-400 uppercase">Awaiting Mgr</p><h4 class="text-2xl font-black text-blue-600 font-heading mt-1">{{ adminStatsAwaitingMgr }}</h4></div>
+                        <div class="p-4 sm:p-5 rounded-2xl glass-card"><p class="text-xs font-bold text-slate-400 uppercase">Approved</p><h4 class="text-2xl font-black text-emerald-600 font-heading mt-1">{{ adminStatsApproved }}</h4></div>
+                        <div class="p-4 sm:p-5 rounded-2xl glass-card"><p class="text-xs font-bold text-slate-400 uppercase">Rejected</p><h4 class="text-2xl font-black text-rose-500 font-heading mt-1">{{ adminStatsRejected }}</h4></div>
                     </div>
 
                     <div class="rounded-3xl glass-card overflow-hidden">
@@ -649,20 +645,44 @@
                             </table>
                         </div>
                     </div>
-                </div>
+                </div>                <div v-show="adminTab === 'reports'" class="space-y-6">
+                    <div class="flex items-start justify-between">
+                        <div>
+                            <h3 class="text-xl font-bold font-heading text-slate-900 dark:text-white">Enterprise Workforce Reports</h3>
+                            <p class="text-xs text-slate-500 mt-1">Professional PDF reports for compliance, auditing, and HR management. All reports include branding and are ready to print.</p>
+                        </div>
+                        <span class="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-[10px] font-extrabold uppercase tracking-wider border border-blue-200 dark:border-blue-700">
+                            <i class="fa-solid fa-file-pdf"></i> PDF Engine Active
+                        </span>
+                    </div>
 
-                <!-- ADMIN SECTION: REPORTS -->
-                <div v-show="adminTab === 'reports'" class="space-y-6">
-                    <div>
-                        <h3 class="text-xl font-bold font-heading text-slate-900 dark:text-white">Reports & Workforce Analytics</h3>
-                        <p class="text-xs text-slate-500 mt-1">Individual and group insights on attendance, leaves, and team performance.</p>
-                    </div>
+                    <!-- KPI Stats -->
                     <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                        <div class="p-5 rounded-2xl glass-card border-l-4 border-l-blue-500"><p class="text-[10px] font-bold uppercase text-slate-400">Total Check-ins</p><h4 class="text-2xl font-black font-heading text-slate-900 dark:text-white mt-1">{{ 180 + timesheets.length * 3 }}</h4></div>
-                        <div class="p-5 rounded-2xl glass-card border-l-4 border-l-emerald-500"><p class="text-[10px] font-bold uppercase text-slate-400">Avg Shift Hours</p><h4 class="text-2xl font-black font-heading text-emerald-600 mt-1">8.5h</h4></div>
-                        <div class="p-5 rounded-2xl glass-card border-l-4 border-l-amber-500"><p class="text-[10px] font-bold uppercase text-slate-400">Leave Days Taken</p><h4 class="text-2xl font-black font-heading text-amber-500 mt-1">{{ leaves.reduce((s,l)=>s+(Number(l.days)||0),0) }}</h4></div>
-                        <div class="p-5 rounded-2xl glass-card border-l-4 border-l-rose-500"><p class="text-[10px] font-bold uppercase text-slate-400">Late Arrivals</p><h4 class="text-2xl font-black font-heading text-rose-500 mt-1">{{ timesheets.filter(t => t.punctuality === 'Late Arrival').length }}</h4></div>
+                        <div class="p-5 rounded-2xl glass-card border-l-4 border-l-blue-500">
+                            <p class="text-[10px] font-bold uppercase text-slate-400">Total Shift Events</p>
+                            <h4 class="text-2xl font-black font-heading text-slate-900 dark:text-white mt-1">{{ timesheets.length }}</h4>
+                            <p class="text-[10px] text-slate-400 mt-1">Logged in system</p>
+                        </div>
+                        <div class="p-5 rounded-2xl glass-card border-l-4 border-l-emerald-500">
+                            <p class="text-[10px] font-bold uppercase text-slate-400">On-Time Compliance</p>
+                            <h4 class="text-2xl font-black font-heading text-emerald-600 mt-1">
+                                {{ timesheets.length > 0 ? Math.round((timesheets.filter(t=>t.punctuality!=='Late Arrival').length/timesheets.length)*100) : 100 }}%
+                            </h4>
+                            <p class="text-[10px] text-slate-400 mt-1">Punctuality rate</p>
+                        </div>
+                        <div class="p-5 rounded-2xl glass-card border-l-4 border-l-amber-500">
+                            <p class="text-[10px] font-bold uppercase text-slate-400">Leave Days Used</p>
+                            <h4 class="text-2xl font-black font-heading text-amber-500 mt-1">{{ leaves.reduce((s,l)=>s+(Number(l.days)||0),0) }}</h4>
+                            <p class="text-[10px] text-slate-400 mt-1">Across all employees</p>
+                        </div>
+                        <div class="p-5 rounded-2xl glass-card border-l-4 border-l-rose-500">
+                            <p class="text-[10px] font-bold uppercase text-slate-400">Late Arrivals</p>
+                            <h4 class="text-2xl font-black font-heading text-rose-500 mt-1">{{ timesheets.filter(t => t.punctuality === 'Late Arrival').length }}</h4>
+                            <p class="text-[10px] text-slate-400 mt-1">Needs attention</p>
+                        </div>
                     </div>
+
+                    <!-- Attendance Chart + Top Performers -->
                     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                         <div class="glass-card p-6 rounded-3xl lg:col-span-2">
                             <h3 class="text-base font-bold font-heading text-slate-900 dark:text-white mb-4">30-Day Attendance Trend</h3>
@@ -684,33 +704,110 @@
                         </div>
                     </div>
 
-                    <!-- Monthly Report Exports -->
+                    <!-- ══════════════════════════════════════════════════════ -->
+                    <!-- ENTERPRISE PDF REPORT EXPORTS -->
+                    <!-- ══════════════════════════════════════════════════════ -->
+
+                    <!-- Month Selector + Period Reports -->
                     <div class="glass-card p-5 sm:p-6 rounded-3xl">
-                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5">
                             <div>
-                                <h4 class="text-base font-bold font-heading text-slate-900 dark:text-white">Monthly Report Export</h4>
-                                <p class="text-xs text-slate-500 mt-0.5">Select a month and export separate CSV files for Leaves and Attendance Hours.</p>
+                                <h4 class="text-base font-bold font-heading text-slate-900 dark:text-white flex items-center gap-2">
+                                    <span class="w-8 h-8 rounded-xl bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 flex items-center justify-center"><i class="fa-solid fa-calendar-days text-sm"></i></span>
+                                    Period-Based PDF Reports
+                                </h4>
+                                <p class="text-xs text-slate-500 mt-0.5 ml-10">Select reporting period and export branded enterprise-grade PDF documents.</p>
                             </div>
                             <div class="flex items-center gap-2">
-                                <label class="text-xs font-bold text-slate-500 uppercase tracking-wider">Month:</label>
-                                <select v-model="reportMonth" class="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-200">
+                                <label class="text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Report Month:</label>
+                                <select v-model="reportMonth" class="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500">
                                     <option v-for="m in availableMonths" :key="m.value" :value="m.value">{{ m.label }}</option>
                                 </select>
                             </div>
                         </div>
-                        <div class="flex flex-wrap gap-3">
-                            <button @click="exportMonthlyLeavesCSV" class="px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold flex items-center gap-2 shadow-md shadow-purple-500/20 transition-all">
-                                <i class="fa-solid fa-file-csv"></i> Export Leaves Report
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <!-- Attendance PDF -->
+                            <button @click="exportAttendancePDF" class="group flex items-start gap-4 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 hover:border-blue-400 dark:hover:border-blue-500 hover:bg-blue-50/60 dark:hover:bg-blue-900/20 transition-all text-left">
+                                <div class="w-11 h-11 rounded-xl bg-blue-100 dark:bg-blue-900/40 text-blue-600 flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
+                                    <i class="fa-solid fa-clock-rotate-left text-lg"></i>
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <p class="text-sm font-bold text-slate-900 dark:text-white">Attendance Audit Report</p>
+                                    <p class="text-[11px] text-slate-500 mt-0.5">Full shift logs, punctuality metrics &amp; KPI summary. Landscape A4.</p>
+                                    <span class="inline-flex items-center gap-1 mt-1.5 text-[10px] font-extrabold uppercase tracking-wider text-blue-600"><i class="fa-solid fa-file-pdf"></i> PDF · All Employees</span>
+                                </div>
                             </button>
-                            <button @click="exportMonthlyHoursCSV" class="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-2 shadow-md shadow-emerald-500/20 transition-all">
-                                <i class="fa-solid fa-clock"></i> Export Hours Report
+
+                            <!-- Leaves PDF -->
+                            <button @click="exportLeavesPDF" class="group flex items-start gap-4 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 hover:border-purple-400 dark:hover:border-purple-500 hover:bg-purple-50/60 dark:hover:bg-purple-900/20 transition-all text-left">
+                                <div class="w-11 h-11 rounded-xl bg-purple-100 dark:bg-purple-900/40 text-purple-600 flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
+                                    <i class="fa-solid fa-umbrella-beach text-lg"></i>
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <p class="text-sm font-bold text-slate-900 dark:text-white">Leaves &amp; Approvals Audit</p>
+                                    <p class="text-[11px] text-slate-500 mt-0.5">Leave requests, approval chain, manager &amp; admin decisions. Landscape A4.</p>
+                                    <span class="inline-flex items-center gap-1 mt-1.5 text-[10px] font-extrabold uppercase tracking-wider text-purple-600"><i class="fa-solid fa-file-pdf"></i> PDF · Full Audit Trail</span>
+                                </div>
                             </button>
-                            <button @click="exportAttendanceCSV" class="px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-bold flex items-center gap-2 transition-all">
-                                <i class="fa-solid fa-table"></i> Full Timesheet CSV
+                        </div>
+                    </div>
+
+                    <!-- Organization Reports -->
+                    <div class="glass-card p-5 sm:p-6 rounded-3xl">
+                        <h4 class="text-base font-bold font-heading text-slate-900 dark:text-white flex items-center gap-2 mb-4">
+                            <span class="w-8 h-8 rounded-xl bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 flex items-center justify-center"><i class="fa-solid fa-building-user text-sm"></i></span>
+                            Organizational &amp; Workforce Reports
+                        </h4>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <!-- Workforce Roster PDF -->
+                            <button @click="exportRosterPDF" class="group flex items-start gap-4 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 hover:border-emerald-400 dark:hover:border-emerald-500 hover:bg-emerald-50/60 dark:hover:bg-emerald-900/20 transition-all text-left">
+                                <div class="w-11 h-11 rounded-xl bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
+                                    <i class="fa-solid fa-users text-lg"></i>
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <p class="text-sm font-bold text-slate-900 dark:text-white">Workforce Roster PDF</p>
+                                    <p class="text-[11px] text-slate-500 mt-0.5">Complete personnel directory with department hierarchy &amp; reporting lines.</p>
+                                    <span class="inline-flex items-center gap-1 mt-1.5 text-[10px] font-extrabold uppercase tracking-wider text-emerald-600"><i class="fa-solid fa-file-pdf"></i> PDF · {{ employees.length }} Employees</span>
+                                </div>
                             </button>
-                            <button @click="exportFullDataCSV" class="px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-bold flex items-center gap-2 transition-all">
-                                <i class="fa-solid fa-users"></i> Full Roster CSV
+
+                            <!-- Data Backup CSV -->
+                            <button @click="exportFullDataCSV" class="group flex items-start gap-4 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 hover:border-amber-400 dark:hover:border-amber-500 hover:bg-amber-50/60 dark:hover:bg-amber-900/20 transition-all text-left">
+                                <div class="w-11 h-11 rounded-xl bg-amber-100 dark:bg-amber-900/40 text-amber-600 flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
+                                    <i class="fa-solid fa-table text-lg"></i>
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <p class="text-sm font-bold text-slate-900 dark:text-white">Full Roster CSV Export</p>
+                                    <p class="text-[11px] text-slate-500 mt-0.5">Spreadsheet-ready employee data for integration with payroll or ERP systems.</p>
+                                    <span class="inline-flex items-center gap-1 mt-1.5 text-[10px] font-extrabold uppercase tracking-wider text-amber-600"><i class="fa-solid fa-file-csv"></i> CSV · Raw Data</span>
+                                </div>
                             </button>
+                        </div>
+                    </div>
+
+                    <!-- Individual Employee Dossier -->
+                    <div class="glass-card p-5 sm:p-6 rounded-3xl">
+                        <h4 class="text-base font-bold font-heading text-slate-900 dark:text-white flex items-center gap-2 mb-1">
+                            <span class="w-8 h-8 rounded-xl bg-rose-100 dark:bg-rose-900/40 text-rose-600 flex items-center justify-center"><i class="fa-solid fa-id-card text-sm"></i></span>
+                            Individual Employee Dossier
+                        </h4>
+                        <p class="text-xs text-slate-500 ml-10 mb-4">Generate a comprehensive performance &amp; attendance dossier for any individual employee — includes shift history, leave trail, and approval audit chain.</p>
+                        <div class="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                            <select v-model="reportDossierEmpId" class="flex-1 px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-rose-500">
+                                <option value="">— Select an Employee —</option>
+                                <option v-for="e in employees" :key="e.id" :value="e.id">{{ e.name }} · {{ e.dept }}</option>
+                            </select>
+                            <button @click="exportEmployeeDossierPDF(reportDossierEmpId)" :disabled="!reportDossierEmpId"
+                                class="flex-shrink-0 px-5 py-2.5 rounded-xl bg-gradient-to-r from-rose-500 to-pink-600 hover:from-rose-600 hover:to-pink-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold flex items-center gap-2 shadow-md shadow-rose-500/20 transition-all">
+                                <i class="fa-solid fa-file-pdf"></i> Generate Dossier PDF
+                            </button>
+                        </div>
+                        <div v-if="reportDossierEmpId" class="mt-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
+                            <p class="text-[11px] text-slate-500">
+                                Generating dossier for: <strong class="text-slate-800 dark:text-white">{{ employees.find(e=>e.id===reportDossierEmpId)?.name }}</strong> ·
+                                {{ employees.find(e=>e.id===reportDossierEmpId)?.dept }} ·
+                                {{ employees.find(e=>e.id===reportDossierEmpId)?.role }}
+                            </p>
                         </div>
                     </div>
                 </div>
@@ -877,6 +974,42 @@
                         <button @click="switchEmpTab('leave')" class="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs flex items-center gap-2 self-start sm:self-auto shadow-md transition-all">
                             <span>Review & Decide</span> <i class="fa-solid fa-arrow-right"></i>
                         </button>
+                    </div>
+
+                    <!-- ═══════════════════════════════════════════════════════ -->
+                    <!-- DAILY INSPIRATIONAL QUOTE WIDGET                       -->
+                    <!-- ═══════════════════════════════════════════════════════ -->
+                    <div class="relative overflow-hidden rounded-3xl p-5 sm:p-6 bg-gradient-to-br from-indigo-600 via-blue-600 to-purple-700 shadow-xl shadow-indigo-500/25">
+                        <div class="absolute inset-0 overflow-hidden pointer-events-none">
+                            <div class="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-white/5"></div>
+                            <div class="absolute -bottom-8 -left-8 w-32 h-32 rounded-full bg-white/5"></div>
+                        </div>
+                        <div class="relative z-10 flex items-start justify-between gap-4">
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-center gap-2 mb-3">
+                                    <span class="w-7 h-7 rounded-lg bg-white/20 flex items-center justify-center flex-shrink-0">
+                                        <i class="fa-solid fa-quote-left text-white/80 text-xs"></i>
+                                    </span>
+                                    <span class="text-[10px] font-extrabold uppercase tracking-[0.15em] text-indigo-200">Daily Inspiration · ARK Shipping</span>
+                                </div>
+                                <div v-if="dailyQuote.loading" class="space-y-2">
+                                    <div class="h-4 bg-white/20 rounded-full animate-pulse w-full"></div>
+                                    <div class="h-4 bg-white/20 rounded-full animate-pulse w-4/5"></div>
+                                    <div class="h-3 bg-white/15 rounded-full animate-pulse w-2/5 mt-3"></div>
+                                </div>
+                                <div v-else>
+                                    <p class="text-white font-semibold text-sm sm:text-base leading-relaxed italic">"{{ dailyQuote.text }}"</p>
+                                    <div class="flex items-center gap-2 mt-3">
+                                        <div class="h-px flex-1 bg-white/20"></div>
+                                        <p class="text-indigo-200 text-xs font-bold flex-shrink-0">— {{ dailyQuote.author }}</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <button @click="fetchDailyQuote(true)" :disabled="dailyQuote.loading"
+                                class="flex-shrink-0 w-9 h-9 rounded-xl bg-white/15 hover:bg-white/25 disabled:opacity-50 flex items-center justify-center text-white transition-all hover:scale-110 active:scale-95" title="Refresh quote">
+                                <i :class="['fa-solid fa-rotate-right text-sm', { 'animate-spin': dailyQuote.loading }]"></i>
+                            </button>
+                        </div>
                     </div>
 
                     <div class="glass-card p-6 sm:p-8 rounded-3xl">
