@@ -36,7 +36,11 @@ const ChartManager = {
         };
     },
 
-    renderWeeklyTrend(canvasId, timesheets = [], employees = [], isDark = false) {
+    renderWeeklyTrend(canvasId, arg2 = [], arg3 = [], arg4 = false) {
+        let timesheets = Array.isArray(arg2) ? arg2 : [];
+        let employees = Array.isArray(arg3) ? arg3 : [];
+        let isDark = typeof arg2 === 'boolean' ? arg2 : typeof arg4 === 'boolean' ? arg4 : false;
+
         const canvas = document.getElementById(canvasId);
         if (!canvas || typeof Chart === 'undefined') return;
         this.destroy('weeklyTrend');
@@ -44,10 +48,10 @@ const ChartManager = {
 
         // Dynamically compute last 7 days attendance %
         const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-        const totalStaff = Math.max(1, employees.filter(e => e.status !== 'Inactive').length);
+        const totalStaff = Math.max(1, employees.filter(e => e && e.status !== 'Inactive').length);
         const dynamicData = days.map((d, idx) => {
             const dayTimesheets = timesheets.filter(t => {
-                if (!t.date) return false;
+                if (!t || !t.date) return false;
                 const date = new Date(t.date);
                 return (date.getDay() + 6) % 7 === idx; // 0=Mon, 6=Sun
             });
@@ -243,16 +247,20 @@ const ChartManager = {
         });
     },
 
-    renderMonthlyAttendance(canvasId, timesheets = [], employees = [], isDark = false) {
+    renderMonthlyAttendance(canvasId, arg2 = [], arg3 = [], arg4 = false) {
+        let timesheets = Array.isArray(arg2) ? arg2 : [];
+        let employees = Array.isArray(arg3) ? arg3 : [];
+        let isDark = typeof arg2 === 'boolean' ? arg2 : typeof arg4 === 'boolean' ? arg4 : false;
+
         const canvas = document.getElementById(canvasId);
         if (!canvas || typeof Chart === 'undefined') return;
         this.destroy('monthlyAttendance');
         const theme = this.getTheme(isDark);
 
-        const totalStaff = Math.max(1, employees.filter(e => e.status !== 'Inactive').length);
+        const totalStaff = Math.max(1, employees.filter(e => e && e.status !== 'Inactive').length);
         const days = Array.from({ length: 15 }, (_, i) => `${i + 1}`);
         const dynamicData = days.map((d, idx) => {
-            const dayTs = timesheets.filter(t => t.date && parseInt(t.date.split('-')[2], 10) === (idx + 1));
+            const dayTs = timesheets.filter(t => t && t.date && parseInt(t.date.split('-')[2], 10) === (idx + 1));
             const uniqueEmps = new Set(dayTs.map(t => String(t.empId))).size;
             return uniqueEmps > 0 ? Math.min(100, Math.round((uniqueEmps / totalStaff) * 100)) : 100;
         });

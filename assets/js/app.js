@@ -529,7 +529,7 @@ const app = createApp({
             adminTab.value = sec;
             nextTick(() => {
                 if (sec === 'overview') {
-                    ChartManager.renderWeeklyTrend('chart-admin-weekly-trend', isDarkMode.value);
+                    ChartManager.renderWeeklyTrend('chart-admin-weekly-trend', timesheets.value, employees.value, isDarkMode.value);
                     ChartManager.renderPresenceDonut('chart-admin-presence-donut', employees.value, isDarkMode.value);
                     ChartManager.renderDeptHeadcount('chart-dept-headcount', departmentList.value, employees.value, isDarkMode.value);
                     ChartManager.renderLeaveTypes('chart-leave-types', 'leave-type-legend', leaves.value, isDarkMode.value);
@@ -537,7 +537,7 @@ const app = createApp({
                     ChartManager.renderAttPunctuality('chart-att-punctuality', 'donut-att-ontime', timesheets.value, isDarkMode.value);
                     ChartManager.renderAttHours('chart-att-hours', timesheets.value, isDarkMode.value);
                 } else if (sec === 'reports') {
-                    ChartManager.renderMonthlyAttendance('chart-monthly-attendance', isDarkMode.value);
+                    ChartManager.renderMonthlyAttendance('chart-monthly-attendance', timesheets.value, employees.value, isDarkMode.value);
                 }
             });
         }
