@@ -58,9 +58,10 @@ const app = createApp({
             }
         }
 
-        // Clear timesheets and leaves test cache unconditionally for fresh client handover
+        // Clear timesheets, leaves, and weekly checkins test cache unconditionally for fresh client handover
         localStorage.removeItem('ark_timesheets');
         localStorage.removeItem('ark_leaves');
+        localStorage.removeItem('ark_emp_weekly_checkins');
 
         // Core Collections with Local Storage Cache (Fresh start default for client delivery)
         const employees = ref(safeParseJSON('ark_employees', null) || (typeof INITIAL_EMPLOYEES !== 'undefined' ? INITIAL_EMPLOYEES.map(e => ({ ...e, leaveQuotas: { annual: 14, sick: 7, casual: 5 } })) : []));
@@ -163,16 +164,8 @@ const app = createApp({
         }
 
         function initEmployeeWeeklyCheckins(empKey) {
-            const emp = employees.value.find(e => String(e.id) === String(empKey));
-            const name = emp ? emp.name : 'Employee';
-            mockWeeklyCheckIns.value = [
-                { date: '2026-09-28', empName: name, checkIn: '08:15 AM', checkOut: '06:15 PM', breakDeducted: '00h 20m', completed: '09h 40m', status: 'Completed', onTime: true },
-                { date: '2026-09-25', empName: name, checkIn: '08:22 AM', checkOut: '06:20 PM', breakDeducted: '00h 25m', completed: '09h 33m', status: 'Completed', onTime: true },
-                { date: '2026-09-24', empName: name, checkIn: '08:10 AM', checkOut: '06:10 PM', breakDeducted: '00h 15m', completed: '09h 45m', status: 'Completed', onTime: true },
-                { date: '2026-09-23', empName: name, checkIn: '08:42 AM', checkOut: '06:30 PM', breakDeducted: '00h 20m', completed: '09h 28m', status: 'Late Arrival', onTime: false },
-                { date: '2026-09-22', empName: name, checkIn: '08:05 AM', checkOut: '06:05 PM', breakDeducted: '00h 20m', completed: '09h 40m', status: 'Completed', onTime: true }
-            ];
-            localStorage.setItem('ark_emp_weekly_checkins_' + empKey, JSON.stringify(mockWeeklyCheckIns.value));
+            mockWeeklyCheckIns.value = [];
+            localStorage.setItem('ark_emp_weekly_checkins_' + empKey, JSON.stringify([]));
         }
 
         function loadUserShiftState(empId) {
@@ -222,13 +215,9 @@ const app = createApp({
                 employeeAttendanceState.value = 'out';
             }
 
-            // Scoped weekly checkins
-            const savedWeekly = localStorage.getItem('ark_emp_weekly_checkins_' + empKey);
-            if (savedWeekly) {
-                try { mockWeeklyCheckIns.value = JSON.parse(savedWeekly); } catch (e) { initEmployeeWeeklyCheckins(empKey); }
-            } else {
-                initEmployeeWeeklyCheckins(empKey);
-            }
+            // Scoped weekly checkins (start fresh/empty)
+            mockWeeklyCheckIns.value = [];
+            localStorage.setItem('ark_emp_weekly_checkins_' + empKey, JSON.stringify([]));
         }
 
         // Modals State
