@@ -58,10 +58,14 @@ const app = createApp({
             }
         }
 
+        // Clear timesheets and leaves test cache unconditionally for fresh client handover
+        localStorage.removeItem('ark_timesheets');
+        localStorage.removeItem('ark_leaves');
+
         // Core Collections with Local Storage Cache (Fresh start default for client delivery)
         const employees = ref(safeParseJSON('ark_employees', null) || (typeof INITIAL_EMPLOYEES !== 'undefined' ? INITIAL_EMPLOYEES.map(e => ({ ...e, leaveQuotas: { annual: 14, sick: 7, casual: 5 } })) : []));
-        const leaves = ref(sanitizeLeavesList(safeParseJSON('ark_leaves', null) || (typeof INITIAL_LEAVES !== 'undefined' ? INITIAL_LEAVES : [])));
-        const timesheets = ref(safeParseJSON('ark_timesheets', null) || (typeof INITIAL_TIMESHEETS !== 'undefined' ? INITIAL_TIMESHEETS : []));
+        const leaves = ref([]);
+        const timesheets = ref([]);
         const departments = ref(safeParseJSON('ark_departments', null) || ['Accounts', 'Documentation', 'Dispatch', 'Operations', 'HR']);
         const notifications = ref(safeParseJSON('ark_notifications', []));
 
@@ -375,18 +379,22 @@ const app = createApp({
                 }
 
                 if (Array.isArray(d.leaves)) {
-                    const remoteLeaves = d.leaves.map(l => ({ ...l, empId: String(l.empId) }));
+                    const remoteLeaves = d.leaves
+                        .filter(l => !String(l.id).startsWith('LV-SEED-'))
+                        .map(l => ({ ...l, empId: String(l.empId) }));
                     const remoteIds = new Set(remoteLeaves.map(l => String(l.id)));
                     const localOnly = leaves.value.filter(l => String(l.id).startsWith('LV-LOCAL-') && !remoteIds.has(String(l.id)));
                     leaves.value = sanitizeLeavesList([...localOnly, ...remoteLeaves]);
                 }
 
                 if (Array.isArray(d.attendance)) {
-                    const remoteTs = d.attendance.map(a => ({
-                        id: a.id, empId: String(a.empId), empName: a.empName || '',
-                        action: a.action || '', time: a.time || '', date: a.date || '',
-                        totalHours: a.totalHours || '', punctuality: a.punctuality || 'On Time'
-                    }));
+                    const remoteTs = d.attendance
+                        .filter(a => !String(a.id).startsWith('TS-SEED-'))
+                        .map(a => ({
+                            id: a.id, empId: String(a.empId), empName: a.empName || '',
+                            action: a.action || '', time: a.time || '', date: a.date || '',
+                            totalHours: a.totalHours || '', punctuality: a.punctuality || 'On Time'
+                        }));
                     const remoteIds = new Set(remoteTs.map(t => String(t.id)));
                     const localOnly = timesheets.value.filter(t => String(t.id).startsWith('TS-LOCAL-') && !remoteIds.has(String(t.id)));
                     const merged = [...localOnly, ...remoteTs];
