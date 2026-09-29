@@ -48,11 +48,10 @@ const app = createApp({
             return result;
         }
 
-        // Core Collections with Local Storage Cache
-        const employees = ref(JSON.parse(localStorage.getItem('ark_employees')) || INITIAL_EMPLOYEES.map(e => ({ ...e })));
-        const initialLeavesRaw = JSON.parse(localStorage.getItem('ark_leaves')) || (typeof INITIAL_LEAVES !== 'undefined' ? INITIAL_LEAVES.map(l => ({ ...l })) : []);
-        const leaves = ref(sanitizeLeavesList(initialLeavesRaw));
-        const timesheets = ref(JSON.parse(localStorage.getItem('ark_timesheets')) || (typeof INITIAL_TIMESHEETS !== 'undefined' ? INITIAL_TIMESHEETS.map(t => ({ ...t })) : []));
+        // Core Collections with Local Storage Cache (Fresh start default for client delivery)
+        const employees = ref(JSON.parse(localStorage.getItem('ark_employees')) || INITIAL_EMPLOYEES.map(e => ({ ...e, leaveQuotas: { annual: 14, sick: 7, casual: 5 } })));
+        const leaves = ref(sanitizeLeavesList(JSON.parse(localStorage.getItem('ark_leaves')) || []));
+        const timesheets = ref(JSON.parse(localStorage.getItem('ark_timesheets')) || []);
         const departments = ref(JSON.parse(localStorage.getItem('ark_departments') || '[]'));
         const notifications = ref(JSON.parse(localStorage.getItem('ark_notifications') || '[]'));
 
@@ -240,13 +239,20 @@ const app = createApp({
             department: false,
             avatar: false,
             editProfile: false,
-            viewProfile: false
+            viewProfile: false,
+            password: false,
+            announcement: false,
+            adminLeave: false
         });
 
         // Form Models
         const loginForm = reactive({ empId: '', password: '', showPassword: false });
-        const empForm = reactive({ id: '', name: '', email: '', dept: 'Accounts', role: '', status: 'Active', managerId: '', password: '' });
+        const empForm = reactive({
+            id: '', name: '', email: '', dept: 'Accounts', role: '', status: 'Active', managerId: '', password: '',
+            leaveQuotaAnnual: 14, leaveQuotaSick: 7, leaveQuotaCasual: 5
+        });
         const leaveForm = reactive({ type: 'Annual Leave', from: '', to: '', reason: '' });
+        const adminLeaveForm = reactive({ empId: '', type: 'Annual Leave', from: '', to: '', reason: '', status: 'Approved' });
         const deptForm = reactive({ name: '', headId: '', headName: '', budget: '' });
         const profileForm = reactive({ name: '', email: '', role: '' });
         const viewedEmployeeId = ref(null);
@@ -870,6 +876,9 @@ const app = createApp({
             empForm.status = 'Active';
             empForm.managerId = '';
             empForm.password = '';
+            empForm.leaveQuotaAnnual = 14;
+            empForm.leaveQuotaSick = 7;
+            empForm.leaveQuotaCasual = 5;
             modals.employee = true;
         }
 
@@ -884,6 +893,9 @@ const app = createApp({
             empForm.status = emp.status;
             empForm.managerId = emp.managerId || '';
             empForm.password = '';
+            empForm.leaveQuotaAnnual = emp.leaveQuotas?.annual ?? 14;
+            empForm.leaveQuotaSick = emp.leaveQuotas?.sick ?? 7;
+            empForm.leaveQuotaCasual = emp.leaveQuotas?.casual ?? 5;
             modals.employee = true;
         }
 
@@ -900,7 +912,12 @@ const app = createApp({
                     status: empForm.status,
                     managerId: empForm.managerId || '',
                     password: empForm.password || undefined,
-                    avatar: AVATARS[Math.floor(Math.random() * AVATARS.length)]
+                    avatar: AVATARS[Math.floor(Math.random() * AVATARS.length)],
+                    leaveQuotas: {
+                        annual: Number(empForm.leaveQuotaAnnual) || 0,
+                        sick: Number(empForm.leaveQuotaSick) || 0,
+                        casual: Number(empForm.leaveQuotaCasual) || 0
+                    }
                 };
 
                 // Optimistic local update
@@ -956,6 +973,24 @@ const app = createApp({
         });
 
         function openAvatarPicker() { modals.avatar = true; }
+        const customAvatarUrl = ref('');
+
+        function setCustomAvatarUrl() {
+            const url = String(customAvatarUrl.value || '').trim();
+            if (!url) {
+                showToast('Please enter a valid image URL or path', 'error');
+                return;
+            }
+            selectAvatar(url);
+            customAvatarUrl.value = '';
+        }
+
+        function isAvatarImage(av) {
+            if (!av) return false;
+            const s = String(av).trim();
+            return s.startsWith('http://') || s.startsWith('https://') || s.startsWith('assets/') || s.startsWith('/') || s.startsWith('data:');
+        }
+
         function selectAvatar(av) {
             if (currentUser.value) {
                 currentUser.value.avatar = av;
@@ -984,6 +1019,79 @@ const app = createApp({
             localStorage.setItem('ark_session', JSON.stringify(currentUser.value));
             modals.editProfile = false;
             showToast('Profile updated', 'success');
+        }
+
+        // ── Change Password & Announcements State & Methods ─────────────────
+        const passwordForm = reactive({ oldPassword: '', newPassword: '', confirmPassword: '' });
+        const announcementForm = reactive({ title: '', message: '', priority: 'Normal' });
+        const announcementsList = ref(JSON.parse(localStorage.getItem('ark_announcements')) || [
+            { id: 'AN-1', title: 'Welcome to ARK HRMS Enterprise', message: 'All employees are requested to maintain punctuality and record shift hours in NJ Time.', date: '2026-09-01', priority: 'High', author: 'Administrator' }
+        ]);
+        watch(announcementsList, () => localStorage.setItem('ark_announcements', JSON.stringify(announcementsList.value)), { deep: true });
+
+        function openChangePasswordModal() {
+            passwordForm.oldPassword = '';
+            passwordForm.newPassword = '';
+            passwordForm.confirmPassword = '';
+            modals.password = true;
+        }
+
+        function submitChangePassword() {
+            if (!passwordForm.oldPassword || !passwordForm.newPassword || !passwordForm.confirmPassword) {
+                showToast('Please fill in all password fields', 'error');
+                return;
+            }
+            if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+                showToast('New passwords do not match', 'error');
+                return;
+            }
+            if (passwordForm.newPassword.length < 6) {
+                showToast('New password must be at least 6 characters long', 'error');
+                return;
+            }
+            const emp = employees.value.find(e => String(e.id) === String(currentUser.value.id));
+            if (!emp) {
+                showToast('User session error', 'error');
+                return;
+            }
+            const currentPass = emp.password || (String(emp.id) === '1' ? 'admin123' : '123456');
+            if (passwordForm.oldPassword !== currentPass) {
+                showToast('Incorrect old password', 'error');
+                return;
+            }
+            emp.password = passwordForm.newPassword;
+            persistState();
+            modals.password = false;
+            showToast('Password updated successfully!', 'success');
+        }
+
+        function openAnnouncementsModal() {
+            modals.announcement = true;
+        }
+
+        function postAnnouncement() {
+            if (!announcementForm.title || !announcementForm.message) {
+                showToast('Please enter both title and message', 'error');
+                return;
+            }
+            const newAnn = {
+                id: 'AN-' + Date.now(),
+                title: announcementForm.title.trim(),
+                message: announcementForm.message.trim(),
+                priority: announcementForm.priority,
+                date: new Date().toISOString().slice(0, 10),
+                author: currentUser.value ? currentUser.value.name : 'Administrator'
+            };
+            announcementsList.value.unshift(newAnn);
+            announcementForm.title = '';
+            announcementForm.message = '';
+            announcementForm.priority = 'Normal';
+            showToast('Announcement posted successfully!', 'success');
+        }
+
+        function deleteAnnouncement(id) {
+            announcementsList.value = announcementsList.value.filter(a => a.id !== id);
+            showToast('Announcement removed', 'info');
         }
 
         function openAddDepartmentModal() {
@@ -1175,6 +1283,74 @@ const app = createApp({
             } finally {
                 hideLoading();
                 isSubmittingLeave.value = false;
+            }
+        }
+
+        // ── Admin Direct Leave Assignment ────────────────────────────────────
+        function openAdminAddLeaveModal() {
+            adminLeaveForm.empId = employees.value[0] ? String(employees.value[0].id) : '';
+            adminLeaveForm.type = 'Annual Leave';
+            adminLeaveForm.from = getNJDateString();
+            adminLeaveForm.to = getNJDateString();
+            adminLeaveForm.reason = '';
+            adminLeaveForm.status = 'Approved';
+            modals.adminLeave = true;
+        }
+
+        async function submitAdminAddLeave() {
+            const { empId, type, from, to, reason, status } = adminLeaveForm;
+            if (!empId) { showToast('Please select an employee', 'error'); return; }
+            if (!from || !to) { showToast('Please select start and end dates', 'error'); return; }
+            if (new Date(from) > new Date(to)) { showToast('Start date cannot be after end date', 'error'); return; }
+
+            const emp = employees.value.find(e => String(e.id) === String(empId));
+            if (!emp) { showToast('Employee not found', 'error'); return; }
+
+            showLoading('Assigning Employee Leave...');
+            try {
+                const d1 = new Date(from), d2 = new Date(to);
+                const days = Math.ceil(Math.abs(d2 - d1) / 86400000) + 1;
+
+                const newReq = {
+                    id: `LV-ADM-${Date.now()}`,
+                    empId: String(emp.id),
+                    empName: emp.name,
+                    type, from, to, days,
+                    reason: reason.trim() || 'Assigned by HR/Admin',
+                    status,
+                    managerId: emp.managerId || '1',
+                    managerName: getEmployeeManagerName(emp.id),
+                    managerDecision: status === 'Approved' ? 'Approved' : '',
+                    managerAt: new Date().toISOString(),
+                    managerNote: 'Created by Admin',
+                    adminId: currentUser.value ? String(currentUser.value.id) : '1',
+                    adminName: currentUser.value ? currentUser.value.name : 'Administrator',
+                    adminDecision: status === 'Approved' ? 'Approved' : status,
+                    adminAt: new Date().toISOString(),
+                    adminNote: 'Created by Admin',
+                    createdAt: new Date().toISOString()
+                };
+
+                leaves.value.unshift(newReq);
+                if (status === 'Approved') {
+                    emp.status = 'On Leave';
+                    emp.usedLeaveDays = Number(emp.usedLeaveDays || 0) + days;
+                }
+                persistState();
+                modals.adminLeave = false;
+                showToast(`Leave assigned for ${emp.name}!`, 'success');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        function clearTestRecords() {
+            if (confirm("Clear all attendance timesheets, leave applications, and notifications? Employees and departments will be kept intact for fresh client delivery.")) {
+                timesheets.value = [];
+                leaves.value = [];
+                notifications.value = [];
+                persistState();
+                showToast('All test records cleared successfully! System is fresh.', 'success');
             }
         }
 
@@ -2293,7 +2469,7 @@ const app = createApp({
             employees, leaves, timesheets, departments, notifications, employeeAttendanceState,
             shiftSession, punchLog, mockWeeklyCheckIns, toast, loading, skeletonLoading, modals,
             loginForm, empForm, leaveForm, deptForm, profileForm, viewedEmployeeId, empFilter, leaveFilterStatus,
-            avatarList: AVATARS,
+            avatarList: AVATARS, customAvatarUrl, setCustomAvatarUrl, isAvatarImage,
             departmentList, departmentOverview, filteredEmployees, adminPendingLeavesCount,
             pendingLeavesOverview, filteredAdminLeaves, mySubmittedLeaves, isUserManager,
             adminStatsAwaitingAdmin, adminStatsAwaitingMgr, adminStatsApproved, adminStatsRejected,
@@ -2312,8 +2488,11 @@ const app = createApp({
             openEmployeeProfileModal, openAvatarPicker, selectAvatar, openEditProfileModal, saveProfileInfo,
             openAddDepartmentModal, saveDepartmentSubmit, adminFinalDecide, managerDecideLeave,
             openApplyLeaveModal, submitApplyLeave, empPunchAction, isPunchDisabled,
+            adminLeaveForm, openAdminAddLeaveModal, submitAdminAddLeave, clearTestRecords,
             exportAttendancePDF, exportLeavesPDF, exportRosterPDF, exportEmployeeDossierPDF,
             exportManagerTeamPDF, exportMyReportPDF,
+            passwordForm, announcementForm, announcementsList,
+            openChangePasswordModal, submitChangePassword, openAnnouncementsModal, postAnnouncement, deleteAnnouncement,
             clearNotifications,
             getBadgeClasses, formatDateNice, getLeaveAuditBadge, isManager, getEmployeeManager, getEmployeeManagerName,
             canAdminDecideLeave, formatSecondsHms, formatSecondsPretty, pad2

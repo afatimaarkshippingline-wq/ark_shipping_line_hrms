@@ -148,7 +148,7 @@
         <!-- TOP NAVBAR -->
         <header class="sticky top-0 z-40 glass-header px-4 sm:px-8 py-3 flex items-center justify-between">
             <div class="flex items-center gap-3 sm:gap-4">
-                <img src="assets/img/ark-logo.svg" alt="ARK Shipping" class="h-8 sm:h-9 w-auto object-contain cursor-pointer"
+                <img src="assets/img/ark-logo.svg" alt="ARK Shipping" class="h-10 sm:h-11 w-auto object-contain cursor-pointer drop-shadow-md hover:scale-105 transition-transform"
                      @click="currentRole === 'admin' ? switchAdminNav('overview') : switchEmpTab('overview')">
                 <span class="hidden sm:inline-block h-5 w-[1px] bg-slate-300 dark:bg-slate-700"></span>
                 <span :class="['px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider', currentRole === 'admin' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300' : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300']">
@@ -192,6 +192,17 @@
                     </div>
                 </div>
 
+                <!-- Announcements Button -->
+                <button @click="openAnnouncementsModal" class="w-9 h-9 rounded-xl flex items-center justify-center text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white bg-slate-100 dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700 relative" title="Company Announcements">
+                    <i class="fa-solid fa-bullhorn text-sm text-indigo-500"></i>
+                    <span v-if="announcementsList.length > 0" class="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-indigo-500"></span>
+                </button>
+
+                <!-- Change Password Button -->
+                <button @click="openChangePasswordModal" class="w-9 h-9 rounded-xl flex items-center justify-center text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white bg-slate-100 dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700" title="Change Password">
+                    <i class="fa-solid fa-key text-sm text-amber-500"></i>
+                </button>
+
                 <!-- Theme Toggle -->
                 <button @click="toggleDarkMode" class="w-9 h-9 rounded-xl flex items-center justify-center text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white bg-slate-100 dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700" title="Toggle Theme">
                     <i :class="['fa-solid', isDarkMode ? 'fa-sun text-amber-400 text-sm' : 'fa-moon text-slate-600 text-sm']"></i>
@@ -199,9 +210,10 @@
 
                 <!-- User Profile Preview -->
                 <div class="flex items-center gap-2 pl-1 sm:pl-2">
-                    <span class="w-9 h-9 rounded-xl bg-blue-100 dark:bg-blue-900/40 text-blue-600 flex items-center justify-center text-lg cursor-pointer"
-                          @click="currentRole === 'employee' ? switchEmpTab('profile') : null">
-                        {{ currentUser.avatar || '👨‍💼' }}
+                    <span class="w-9 h-9 rounded-xl bg-blue-100 dark:bg-blue-900/40 text-blue-600 flex items-center justify-center text-lg cursor-pointer overflow-hidden"
+                          @click="currentRole === 'employee' ? switchEmpTab('profile') : null" title="My Profile">
+                        <img v-if="isAvatarImage(currentUser.avatar)" :src="currentUser.avatar" alt="Avatar" class="w-full h-full object-cover">
+                        <span v-else>{{ currentUser.avatar || '👨‍💼' }}</span>
                     </span>
                     <div class="hidden lg:block leading-tight text-left">
                         <p class="text-xs font-bold text-slate-800 dark:text-white">{{ currentUser.name }}</p>
@@ -594,13 +606,18 @@
                                 <h3 class="text-base font-bold font-heading text-slate-900 dark:text-white">Leave Requests & Approvals Queue</h3>
                                 <p class="text-xs text-slate-500">Employee → 1st Level Manager → 2nd Level Admin. Manager Leave → Direct Admin Decision.</p>
                             </div>
-                            <select v-model="leaveFilterStatus" class="py-1.5 px-3 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100">
-                                <option value="All">All Statuses</option>
-                                <option value="Pending">Pending</option>
-                                <option value="ManagerApproved">Manager Approved</option>
-                                <option value="Approved">Approved</option>
-                                <option value="Rejected">Rejected</option>
-                            </select>
+                            <div class="flex items-center gap-2">
+                                <button @click="openAdminAddLeaveModal" class="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-blue-500/20">
+                                    <i class="fa-solid fa-plus"></i> Assign Leave
+                                </button>
+                                <select v-model="leaveFilterStatus" class="py-1.5 px-3 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 font-bold">
+                                    <option value="All">All Statuses</option>
+                                    <option value="Pending">Pending</option>
+                                    <option value="ManagerApproved">Manager Approved</option>
+                                    <option value="Approved">Approved</option>
+                                    <option value="Rejected">Rejected</option>
+                                </select>
+                            </div>
                         </div>
                         <div class="overflow-x-auto">
                             <table class="w-full min-w-[650px] text-left border-collapse text-xs">
@@ -944,15 +961,18 @@
                         </div>
                     </div>
 
-                    <!-- Workspace State Management -->
+                    <!-- Workspace State Management & Fresh Start -->
                     <div class="glass-card p-6 rounded-3xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                         <div>
-                            <h4 class="text-sm font-bold text-slate-900 dark:text-white">Workspace State Management</h4>
-                            <p class="text-xs text-slate-500">Export JSON state backup or reset all mock local data.</p>
+                            <h4 class="text-sm font-bold text-slate-900 dark:text-white">Workspace &amp; Fresh Delivery Tools</h4>
+                            <p class="text-xs text-slate-500">Export JSON backup, clear test records for fresh client handover, or reset workspace.</p>
                         </div>
-                        <div class="flex items-center gap-2">
+                        <div class="flex flex-wrap items-center gap-2">
                             <button @click="downloadJsonBackup" class="px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5 hover:bg-slate-100 dark:hover:bg-slate-800">
                                 <i class="fa-solid fa-cloud-arrow-down text-blue-500"></i> Backup JSON
+                            </button>
+                            <button @click="clearTestRecords" class="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-amber-500/20">
+                                <i class="fa-solid fa-broom"></i> Clear Test Records
                             </button>
                             <button @click="resetWorkspaceData" class="px-3.5 py-2 rounded-xl border border-rose-200 dark:border-rose-900 text-xs font-bold text-rose-600 flex items-center gap-1.5 hover:bg-rose-50 dark:hover:bg-rose-950/20">
                                 <i class="fa-solid fa-rotate-left"></i> Reset Workspace
@@ -1003,6 +1023,9 @@
                     <button @click="switchEmpTab('leave')" :class="['admin-nav-btn', { active: empTab === 'leave' }]">
                         <i class="fa-solid fa-calendar-days"></i> Leave & Approvals
                         <span v-if="managerSubordinatePendingCount > 0" class="ml-1 px-1.5 py-0.5 rounded-full text-[10px] bg-amber-500 text-white font-extrabold">{{ managerSubordinatePendingCount }}</span>
+                    </button>
+                    <button @click="switchEmpTab('reports')" :class="['admin-nav-btn', { active: empTab === 'reports' }]">
+                        <i class="fa-solid fa-chart-bar"></i> Reports
                     </button>
                     <button @click="switchEmpTab('profile')" :class="['admin-nav-btn', { active: empTab === 'profile' }]">
                         <i class="fa-solid fa-user-gear"></i> My Profile
@@ -1305,57 +1328,7 @@
                         </div>
                     </div>
 
-                    <!-- Manager Team Reports Hub with Date Range & Subordinate Selection -->
-                    <div v-if="isUserManager" class="glass-card p-5 sm:p-6 rounded-3xl border-2 border-amber-500/30 bg-amber-500/5 mb-6">
-                        <h4 class="text-base font-bold font-heading text-slate-900 dark:text-white flex items-center gap-2 mb-3">
-                            <span class="w-8 h-8 rounded-xl bg-amber-100 dark:bg-amber-900/40 text-amber-600 flex items-center justify-center"><i class="fa-solid fa-file-pdf text-sm"></i></span>
-                            Team & Subordinates Reporting Hub
-                        </h4>
-                        <div class="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs mb-4">
-                            <div>
-                                <label class="block font-bold uppercase text-slate-500 mb-1">Date Mode</label>
-                                <select v-model="mgrReportDateMode" class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-bold text-slate-700 dark:text-slate-200">
-                                    <option value="month">Monthly Selection</option>
-                                    <option value="custom">Custom Date Range</option>
-                                </select>
-                            </div>
-                            <div v-if="mgrReportDateMode === 'month'">
-                                <label class="block font-bold uppercase text-slate-500 mb-1">Select Month</label>
-                                <select v-model="mgrReportMonth" class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-bold text-slate-700 dark:text-slate-200">
-                                    <option v-for="m in availableMonths" :key="m.value" :value="m.value">{{ m.label }}</option>
-                                </select>
-                            </div>
-                            <template v-else>
-                                <div>
-                                    <label class="block font-bold uppercase text-slate-500 mb-1">Start Date</label>
-                                    <input type="date" v-model="mgrReportStartDate" class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-bold text-slate-700 dark:text-slate-200">
-                                </div>
-                                <div>
-                                    <label class="block font-bold uppercase text-slate-500 mb-1">End Date</label>
-                                    <input type="date" v-model="mgrReportEndDate" class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-bold text-slate-700 dark:text-slate-200">
-                                </div>
-                            </template>
-                            <div>
-                                <label class="block font-bold uppercase text-slate-500 mb-1">Target Member</label>
-                                <select v-model="mgrReportSubId" class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-bold text-slate-700 dark:text-slate-200">
-                                    <option value="all">All Subordinates (Team)</option>
-                                    <option v-for="sub in userSubordinates" :key="sub.id" :value="sub.id">{{ sub.name }} (ID: {{ sub.id }})</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label class="block font-bold uppercase text-slate-500 mb-1">Report Type</label>
-                                <select v-model="mgrReportType" class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-bold text-slate-700 dark:text-slate-200">
-                                    <option value="attendance">Attendance & Shift Logs</option>
-                                    <option value="leaves">Leave & Approvals Audit</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="flex items-center justify-end">
-                            <button @click="exportManagerTeamPDF" class="px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold flex items-center gap-2 shadow-md shadow-amber-500/25 transition-all">
-                                <i class="fa-solid fa-download"></i> Generate Team Report PDF
-                            </button>
-                        </div>
-                    </div>
+                    <!-- Team reporting hub moved to dedicated Reports tab -->
 
                     <!-- Manager View: Subordinates Grid -->
                     <div v-if="isUserManager" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -1515,8 +1488,9 @@
                     <div class="glass-card p-6 sm:p-8 rounded-3xl">
                         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-6 pb-6 border-b border-slate-200/80 dark:border-slate-800">
                             <div class="flex items-center gap-5">
-                                <button @click="openAvatarPicker" class="w-20 h-20 rounded-3xl bg-blue-100 dark:bg-blue-900/40 text-blue-600 flex items-center justify-center text-4xl shadow-lg hover:scale-105 transition-transform" title="Click to change avatar">
-                                    <span>{{ currentUser.avatar || '👨‍💼' }}</span>
+                                <button @click="openAvatarPicker" class="w-20 h-20 rounded-3xl bg-blue-100 dark:bg-blue-900/40 text-blue-600 flex items-center justify-center text-4xl shadow-lg hover:scale-105 transition-transform overflow-hidden" title="Click to change avatar or profile picture">
+                                    <img v-if="isAvatarImage(currentUser.avatar)" :src="currentUser.avatar" alt="Avatar" class="w-full h-full object-cover">
+                                    <span v-else>{{ currentUser.avatar || '👨‍💼' }}</span>
                                 </button>
                                 <div>
                                     <span class="text-xs font-bold text-blue-600 uppercase tracking-widest">Verified Employee</span>
@@ -1540,53 +1514,6 @@
                             <div class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50">
                                 <span class="text-[11px] text-slate-400 font-bold uppercase block">Department</span>
                                 <span class="text-sm font-extrabold text-slate-800 dark:text-white mt-1 block">{{ currentUser.dept }}</span>
-                            </div>
-                        </div>
-
-                        <!-- Personal Report Download Card with Date Range Selection -->
-                        <div class="mt-6 pt-6 border-t border-slate-200/80 dark:border-slate-800">
-                            <h4 class="text-sm font-bold font-heading text-slate-900 dark:text-white mb-3 flex items-center gap-2">
-                                <i class="fa-solid fa-file-arrow-down text-blue-600"></i> My Personal Reports & Date Selection
-                            </h4>
-                            <div class="p-4 rounded-2xl bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200/50 dark:border-blue-800/40 text-xs space-y-3">
-                                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                                    <div>
-                                        <label class="block font-bold uppercase text-slate-500 mb-1">Date Mode</label>
-                                        <select v-model="myReportDateMode" class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-bold text-slate-700 dark:text-slate-200">
-                                            <option value="month">Monthly Selection</option>
-                                            <option value="custom">Custom Date Range</option>
-                                        </select>
-                                    </div>
-                                    <div v-if="myReportDateMode === 'month'">
-                                        <label class="block font-bold uppercase text-slate-500 mb-1">Select Month</label>
-                                        <select v-model="myReportMonth" class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-bold text-slate-700 dark:text-slate-200">
-                                            <option v-for="m in availableMonths" :key="m.value" :value="m.value">{{ m.label }}</option>
-                                        </select>
-                                    </div>
-                                    <template v-else>
-                                        <div>
-                                            <label class="block font-bold uppercase text-slate-500 mb-1">Start Date</label>
-                                            <input type="date" v-model="myReportStartDate" class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-bold text-slate-700 dark:text-slate-200">
-                                        </div>
-                                        <div>
-                                            <label class="block font-bold uppercase text-slate-500 mb-1">End Date</label>
-                                            <input type="date" v-model="myReportEndDate" class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-bold text-slate-700 dark:text-slate-200">
-                                        </div>
-                                    </template>
-                                    <div>
-                                        <label class="block font-bold uppercase text-slate-500 mb-1">Report Type</label>
-                                        <select v-model="myReportType" class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-bold text-slate-700 dark:text-slate-200">
-                                            <option value="attendance">Attendance & Shift Logs</option>
-                                            <option value="leaves">Leave & Approvals Audit</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                <div class="flex items-center justify-between pt-2">
-                                    <p class="text-[11px] text-slate-500">Export certified PDF record of your attendance or leave history for the selected period.</p>
-                                    <button @click="exportMyReportPDF" class="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold flex items-center gap-2 shadow-md shadow-blue-500/20">
-                                        <i class="fa-solid fa-file-pdf"></i> Download My Report PDF
-                                    </button>
-                                </div>
                             </div>
                         </div>
 
@@ -1619,6 +1546,114 @@
                                     </div>
                                 </div>
                             </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB: REPORTS -->
+                <div v-show="empTab === 'reports'" class="space-y-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h3 class="text-xl font-black font-heading text-slate-900 dark:text-white">Workforce Reports &amp; Downloads</h3>
+                            <p class="text-xs text-slate-500">Generate and download certified PDF reports for attendance logs, shifts, and leaves.</p>
+                        </div>
+                    </div>
+
+                    <!-- Manager Team Reporting Hub (If Manager) -->
+                    <div v-if="isUserManager" class="glass-card p-5 sm:p-6 rounded-3xl border-2 border-amber-500/30 bg-amber-500/5">
+                        <h4 class="text-base font-bold font-heading text-slate-900 dark:text-white flex items-center gap-2 mb-3">
+                            <span class="w-8 h-8 rounded-xl bg-amber-100 dark:bg-amber-900/40 text-amber-600 flex items-center justify-center"><i class="fa-solid fa-file-pdf text-sm"></i></span>
+                            Team &amp; Subordinates Reporting Hub
+                        </h4>
+                        <div class="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs mb-4">
+                            <div>
+                                <label class="block font-bold uppercase text-slate-500 mb-1">Date Mode</label>
+                                <select v-model="mgrReportDateMode" class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-bold text-slate-700 dark:text-slate-200">
+                                    <option value="month">Monthly Selection</option>
+                                    <option value="custom">Custom Date Range</option>
+                                </select>
+                            </div>
+                            <div v-if="mgrReportDateMode === 'month'">
+                                <label class="block font-bold uppercase text-slate-500 mb-1">Select Month</label>
+                                <select v-model="mgrReportMonth" class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-bold text-slate-700 dark:text-slate-200">
+                                    <option v-for="m in availableMonths" :key="m.value" :value="m.value">{{ m.label }}</option>
+                                </select>
+                            </div>
+                            <template v-else>
+                                <div>
+                                    <label class="block font-bold uppercase text-slate-500 mb-1">Start Date</label>
+                                    <input type="date" v-model="mgrReportStartDate" class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-bold text-slate-700 dark:text-slate-200">
+                                </div>
+                                <div>
+                                    <label class="block font-bold uppercase text-slate-500 mb-1">End Date</label>
+                                    <input type="date" v-model="mgrReportEndDate" class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-bold text-slate-700 dark:text-slate-200">
+                                </div>
+                            </template>
+                            <div>
+                                <label class="block font-bold uppercase text-slate-500 mb-1">Target Member</label>
+                                <select v-model="mgrReportSubId" class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-bold text-slate-700 dark:text-slate-200">
+                                    <option value="all">All Subordinates (Team)</option>
+                                    <option v-for="sub in userSubordinates" :key="sub.id" :value="sub.id">{{ sub.name }} (ID: {{ sub.id }})</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block font-bold uppercase text-slate-500 mb-1">Report Type</label>
+                                <select v-model="mgrReportType" class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-bold text-slate-700 dark:text-slate-200">
+                                    <option value="attendance">Attendance &amp; Shift Logs</option>
+                                    <option value="leaves">Leave &amp; Approvals Audit</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="flex items-center justify-end">
+                            <button @click="exportManagerTeamPDF" class="px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold flex items-center gap-2 shadow-md shadow-amber-500/25 transition-all">
+                                <i class="fa-solid fa-download"></i> Generate Team Report PDF
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Personal Report Download Card -->
+                    <div class="glass-card p-5 sm:p-6 rounded-3xl border-2 border-blue-500/20 bg-blue-500/5">
+                        <h4 class="text-base font-bold font-heading text-slate-900 dark:text-white flex items-center gap-2 mb-3">
+                            <span class="w-8 h-8 rounded-xl bg-blue-100 dark:bg-blue-900/40 text-blue-600 flex items-center justify-center"><i class="fa-solid fa-file-arrow-down text-sm"></i></span>
+                            My Personal Reports &amp; Date Selection
+                        </h4>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs mb-4">
+                            <div>
+                                <label class="block font-bold uppercase text-slate-500 mb-1">Date Mode</label>
+                                <select v-model="myReportDateMode" class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-bold text-slate-700 dark:text-slate-200">
+                                    <option value="month">Monthly Selection</option>
+                                    <option value="custom">Custom Date Range</option>
+                                </select>
+                            </div>
+                            <div v-if="myReportDateMode === 'month'">
+                                <label class="block font-bold uppercase text-slate-500 mb-1">Select Month</label>
+                                <select v-model="myReportMonth" class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-bold text-slate-700 dark:text-slate-200">
+                                    <option v-for="m in availableMonths" :key="m.value" :value="m.value">{{ m.label }}</option>
+                                </select>
+                            </div>
+                            <template v-else>
+                                <div>
+                                    <label class="block font-bold uppercase text-slate-500 mb-1">Start Date</label>
+                                    <input type="date" v-model="myReportStartDate" class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-bold text-slate-700 dark:text-slate-200">
+                                </div>
+                                <div>
+                                    <label class="block font-bold uppercase text-slate-500 mb-1">End Date</label>
+                                    <input type="date" v-model="myReportEndDate" class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-bold text-slate-700 dark:text-slate-200">
+                                </div>
+                            </template>
+                            <div>
+                                <label class="block font-bold uppercase text-slate-500 mb-1">Report Type</label>
+                                <select v-model="myReportType" class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-bold text-slate-700 dark:text-slate-200">
+                                    <option value="attendance">Attendance &amp; Shift Logs</option>
+                                    <option value="leaves">Leave &amp; Approvals Audit</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <p class="text-[11px] text-slate-500">Export certified PDF record of your attendance or leave history for the selected period.</p>
+                            <button @click="exportMyReportPDF" class="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold flex items-center gap-2 shadow-md shadow-blue-500/20">
+                                <i class="fa-solid fa-file-pdf"></i> Download My Report PDF
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -1681,6 +1716,24 @@
                     <label class="block text-xs font-bold uppercase text-slate-500 mb-1">Password <span class="text-slate-400 normal-case">(blank = default 123456)</span></label>
                     <input type="text" v-model="empForm.password" placeholder="123456" class="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs sm:text-sm">
                 </div>
+                <!-- Custom Leave Allowances Per Employee -->
+                <div class="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-2">
+                    <label class="block text-xs font-bold uppercase text-slate-500">Custom Yearly Leave Quotas (Days)</label>
+                    <div class="grid grid-cols-3 gap-2">
+                        <div>
+                            <span class="text-[10px] text-slate-400 font-bold block mb-1">Annual</span>
+                            <input type="number" v-model="empForm.leaveQuotaAnnual" min="0" class="w-full p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-bold">
+                        </div>
+                        <div>
+                            <span class="text-[10px] text-slate-400 font-bold block mb-1">Sick</span>
+                            <input type="number" v-model="empForm.leaveQuotaSick" min="0" class="w-full p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-bold">
+                        </div>
+                        <div>
+                            <span class="text-[10px] text-slate-400 font-bold block mb-1">Casual</span>
+                            <input type="number" v-model="empForm.leaveQuotaCasual" min="0" class="w-full p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-bold">
+                        </div>
+                    </div>
+                </div>
                 <div class="pt-3 sm:pt-4 flex justify-end gap-2 border-t border-slate-100 dark:border-slate-800">
                     <button type="button" @click="modals.employee = false" class="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-600 dark:text-slate-300">Cancel</button>
                     <button type="submit" class="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md shadow-blue-500/20">Save Employee</button>
@@ -1731,6 +1784,60 @@
         </div>
     </div>
 
+    <!-- MODAL: ADMIN ASSIGN LEAVE -->
+    <div v-if="modals.adminLeave" class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/50 backdrop-blur-md overflow-y-auto">
+        <div class="w-full max-w-md my-auto p-5 sm:p-8 rounded-2xl sm:rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl overflow-y-auto max-h-[90vh]">
+            <div class="flex items-center justify-between pb-3 sm:pb-4 border-b border-slate-100 dark:border-slate-800 mb-4 sm:mb-5">
+                <h3 class="text-base sm:text-lg font-bold font-heading text-slate-900 dark:text-white flex items-center gap-2">
+                    <i class="fa-solid fa-user-pen text-blue-600"></i> Assign Leave to Employee
+                </h3>
+                <button @click="modals.adminLeave = false" class="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 flex items-center justify-center"><i class="fa-solid fa-xmark text-sm"></i></button>
+            </div>
+            <form @submit.prevent="submitAdminAddLeave" class="space-y-3 sm:space-y-4">
+                <div>
+                    <label class="block text-xs font-bold uppercase text-slate-500 mb-1">Select Employee</label>
+                    <select v-model="adminLeaveForm.empId" class="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs sm:text-sm font-bold">
+                        <option v-for="e in employees" :key="e.id" :value="e.id">{{ e.name }} · {{ e.dept }} (ID: {{ e.id }})</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold uppercase text-slate-500 mb-1">Leave Category</label>
+                    <select v-model="adminLeaveForm.type" class="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs sm:text-sm">
+                        <option value="Annual Leave">Annual Leave</option>
+                        <option value="Sick Leave">Sick / Medical Leave</option>
+                        <option value="Casual Leave">Casual / Personal</option>
+                        <option value="Work From Home">Work From Home</option>
+                    </select>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold uppercase text-slate-500 mb-1">From Date</label>
+                        <input type="date" v-model="adminLeaveForm.from" required class="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs sm:text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold uppercase text-slate-500 mb-1">To Date</label>
+                        <input type="date" v-model="adminLeaveForm.to" required class="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs sm:text-sm">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold uppercase text-slate-500 mb-1">Initial Status</label>
+                    <select v-model="adminLeaveForm.status" class="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs sm:text-sm font-bold">
+                        <option value="Approved">Approved (Immediate)</option>
+                        <option value="Pending">Pending (Queue)</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold uppercase text-slate-500 mb-1">Reason / Notes</label>
+                    <textarea v-model="adminLeaveForm.reason" rows="2" placeholder="Assigned by Admin..." class="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs sm:text-sm"></textarea>
+                </div>
+                <div class="pt-3 sm:pt-4 flex justify-end gap-2 border-t border-slate-100 dark:border-slate-800">
+                    <button type="button" @click="modals.adminLeave = false" class="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-600 dark:text-slate-300">Cancel</button>
+                    <button type="submit" class="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md shadow-blue-500/20">Assign Leave</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- MODAL: ADD DEPARTMENT -->
     <div v-if="modals.department" class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/50 backdrop-blur-md overflow-y-auto">
         <div class="w-full max-w-md my-auto p-5 sm:p-8 rounded-2xl sm:rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl overflow-y-auto max-h-[90vh]">
@@ -1751,13 +1858,25 @@
         </div>
     </div>
 
-    <!-- MODAL: AVATAR PICKER -->
+    <!-- MODAL: AVATAR & PROFILE PICTURE PICKER -->
     <div v-if="modals.avatar" class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/50 backdrop-blur-md overflow-y-auto">
         <div class="w-full max-w-sm my-auto p-5 sm:p-6 rounded-2xl sm:rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl overflow-y-auto max-h-[90vh]">
             <div class="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800 mb-4">
-                <h4 class="text-base font-bold font-heading text-slate-900 dark:text-white">Pick Avatar</h4>
+                <h4 class="text-base font-bold font-heading text-slate-900 dark:text-white">Choose Avatar or Picture</h4>
                 <button @click="modals.avatar = false" class="w-7 h-7 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 flex items-center justify-center"><i class="fa-solid fa-xmark text-xs"></i></button>
             </div>
+
+            <!-- Custom Image URL Input -->
+            <div class="mb-4 pb-4 border-b border-slate-100 dark:border-slate-800 space-y-2">
+                <label class="block text-xs font-bold uppercase text-slate-500">Profile Picture URL / Asset Path</label>
+                <div class="flex gap-2">
+                    <input type="text" v-model="customAvatarUrl" placeholder="e.g. assets/img/ark-logo.svg or https://..." class="flex-1 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-mono">
+                    <button type="button" @click="setCustomAvatarUrl" class="px-3 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md">Set</button>
+                </div>
+                <p class="text-[10px] text-slate-400">Paste any image URL or local folder asset path (e.g., `assets/img/...`).</p>
+            </div>
+
+            <label class="block text-xs font-bold uppercase text-slate-500 mb-2">Or Pick Emoji Avatar</label>
             <div class="grid grid-cols-5 gap-2.5">
                 <button v-for="av in avatarList" :key="av" type="button" @click="selectAvatar(av)"
                         class="h-12 w-12 rounded-2xl text-2xl flex items-center justify-center bg-slate-50 dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-900/40 hover:scale-110 transition-all border border-slate-200/60 dark:border-slate-700">
@@ -1783,6 +1902,186 @@
                     <button type="submit" class="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-md shadow-blue-500/20">Save</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- MODAL: CHANGE PASSWORD -->
+    <div v-if="modals.password" class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/50 backdrop-blur-md overflow-y-auto">
+        <div class="w-full max-w-md my-auto p-5 sm:p-6 rounded-2xl sm:rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800 mb-4">
+                <h4 class="text-base font-bold font-heading text-slate-900 dark:text-white flex items-center gap-2">
+                    <i class="fa-solid fa-key text-amber-500"></i> Change Password
+                </h4>
+                <button @click="modals.password = false" class="w-7 h-7 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 flex items-center justify-center"><i class="fa-solid fa-xmark text-xs"></i></button>
+            </div>
+            <form @submit.prevent="submitChangePassword" class="space-y-3 text-xs sm:text-sm">
+                <div>
+                    <label class="block text-slate-500 font-semibold mb-1">Old Password</label>
+                    <input type="password" v-model="passwordForm.oldPassword" required placeholder="Enter current password" class="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs sm:text-sm">
+                </div>
+                <div>
+                    <label class="block text-slate-500 font-semibold mb-1">New Password</label>
+                    <input type="password" v-model="passwordForm.newPassword" required placeholder="At least 6 characters" class="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs sm:text-sm">
+                </div>
+                <div>
+                    <label class="block text-slate-500 font-semibold mb-1">Confirm New Password</label>
+                    <input type="password" v-model="passwordForm.confirmPassword" required placeholder="Re-enter new password" class="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs sm:text-sm">
+                </div>
+                <div class="pt-3 flex justify-end gap-2 border-t border-slate-100 dark:border-slate-800">
+                    <button type="button" @click="modals.password = false" class="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 font-bold text-slate-600 dark:text-slate-300">Cancel</button>
+                    <button type="submit" class="px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold shadow-md shadow-amber-500/20">Update Password</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: COMPANY ANNOUNCEMENTS -->
+    <div v-if="modals.announcement" class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/50 backdrop-blur-md overflow-y-auto">
+        <div class="w-full max-w-lg my-auto p-5 sm:p-8 rounded-2xl sm:rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between pb-3 sm:pb-4 border-b border-slate-100 dark:border-slate-800 mb-4 sm:mb-5">
+                <h3 class="text-base sm:text-lg font-bold font-heading text-slate-900 dark:text-white flex items-center gap-2">
+                    <i class="fa-solid fa-bullhorn text-indigo-500"></i> Company Announcements &amp; Notices
+                </h3>
+                <button @click="modals.announcement = false" class="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 flex items-center justify-center"><i class="fa-solid fa-xmark text-sm"></i></button>
+            </div>
+
+            <!-- Admin: Post Announcement Form -->
+            <div v-if="currentRole === 'admin'" class="mb-5 p-4 rounded-2xl bg-indigo-500/5 border border-indigo-500/20 space-y-3">
+                <h4 class="text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">Post New Announcement</h4>
+                <form @submit.prevent="postAnnouncement" class="space-y-3 text-xs">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block font-bold text-slate-500 mb-1">Title</label>
+                            <input type="text" v-model="announcementForm.title" required placeholder="Announcement title" class="w-full p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
+                        </div>
+                        <div>
+                            <label class="block font-bold text-slate-500 mb-1">Priority</label>
+                            <select v-model="announcementForm.priority" class="w-full p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-bold">
+                                <option value="Normal">Normal Notice</option>
+                                <option value="High">High Priority / Urgent</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block font-bold text-slate-500 mb-1">Message</label>
+                        <textarea v-model="announcementForm.message" required rows="3" placeholder="Write announcement details..." class="w-full p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"></textarea>
+                    </div>
+                    <div class="flex justify-end">
+                        <button type="submit" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-indigo-500/20">
+                            <i class="fa-solid fa-paper-plane"></i> Publish Announcement
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Announcements List -->
+            <div class="space-y-3">
+                <div v-for="ann in announcementsList" :key="ann.id" class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 relative">
+                    <div class="flex items-center justify-between mb-1.5">
+                        <div class="flex items-center gap-2">
+                            <span :class="['px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase', ann.priority === 'High' ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400' : 'bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400']">
+                                {{ ann.priority }} Priority
+                            </span>
+                            <span class="text-[11px] font-mono text-slate-400">{{ ann.date }}</span>
+                        </div>
+                        <button v-if="currentRole === 'admin'" @click="deleteAnnouncement(ann.id)" class="text-slate-400 hover:text-rose-600 text-xs" title="Delete Announcement"><i class="fa-solid fa-trash"></i></button>
+                    </div>
+                    <h4 class="text-sm font-bold font-heading text-slate-900 dark:text-white">{{ ann.title }}</h4>
+                    <p class="text-xs text-slate-600 dark:text-slate-300 mt-1 leading-relaxed whitespace-pre-line">{{ ann.message }}</p>
+                    <span class="text-[10px] text-slate-400 block mt-2 italic">Posted by: {{ ann.author || 'Administrator' }}</span>
+                </div>
+                <p v-if="!announcementsList.length" class="text-xs text-slate-400 text-center py-8">No announcements found.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: CHANGE PASSWORD -->
+    <div v-if="modals.password" class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/50 backdrop-blur-md overflow-y-auto">
+        <div class="w-full max-w-md my-auto p-5 sm:p-6 rounded-2xl sm:rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800 mb-4">
+                <h4 class="text-base font-bold font-heading text-slate-900 dark:text-white flex items-center gap-2">
+                    <i class="fa-solid fa-key text-amber-500"></i> Change Password
+                </h4>
+                <button @click="modals.password = false" class="w-7 h-7 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 flex items-center justify-center"><i class="fa-solid fa-xmark text-xs"></i></button>
+            </div>
+            <form @submit.prevent="submitChangePassword" class="space-y-3 text-xs sm:text-sm">
+                <div>
+                    <label class="block text-slate-500 font-semibold mb-1">Old Password</label>
+                    <input type="password" v-model="passwordForm.oldPassword" required placeholder="Enter current password" class="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs sm:text-sm">
+                </div>
+                <div>
+                    <label class="block text-slate-500 font-semibold mb-1">New Password</label>
+                    <input type="password" v-model="passwordForm.newPassword" required placeholder="At least 6 characters" class="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs sm:text-sm">
+                </div>
+                <div>
+                    <label class="block text-slate-500 font-semibold mb-1">Confirm New Password</label>
+                    <input type="password" v-model="passwordForm.confirmPassword" required placeholder="Re-enter new password" class="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs sm:text-sm">
+                </div>
+                <div class="pt-3 flex justify-end gap-2 border-t border-slate-100 dark:border-slate-800">
+                    <button type="button" @click="modals.password = false" class="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 font-bold text-slate-600 dark:text-slate-300">Cancel</button>
+                    <button type="submit" class="px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold shadow-md shadow-amber-500/20">Update Password</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: COMPANY ANNOUNCEMENTS -->
+    <div v-if="modals.announcement" class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/50 backdrop-blur-md overflow-y-auto">
+        <div class="w-full max-w-lg my-auto p-5 sm:p-8 rounded-2xl sm:rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between pb-3 sm:pb-4 border-b border-slate-100 dark:border-slate-800 mb-4 sm:mb-5">
+                <h3 class="text-base sm:text-lg font-bold font-heading text-slate-900 dark:text-white flex items-center gap-2">
+                    <i class="fa-solid fa-bullhorn text-indigo-500"></i> Company Announcements &amp; Notices
+                </h3>
+                <button @click="modals.announcement = false" class="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 flex items-center justify-center"><i class="fa-solid fa-xmark text-sm"></i></button>
+            </div>
+
+            <!-- Admin: Post Announcement Form -->
+            <div v-if="currentRole === 'admin'" class="mb-5 p-4 rounded-2xl bg-indigo-500/5 border border-indigo-500/20 space-y-3">
+                <h4 class="text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">Post New Announcement</h4>
+                <form @submit.prevent="postAnnouncement" class="space-y-3 text-xs">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block font-bold text-slate-500 mb-1">Title</label>
+                            <input type="text" v-model="announcementForm.title" required placeholder="Announcement title" class="w-full p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
+                        </div>
+                        <div>
+                            <label class="block font-bold text-slate-500 mb-1">Priority</label>
+                            <select v-model="announcementForm.priority" class="w-full p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-bold">
+                                <option value="Normal">Normal Notice</option>
+                                <option value="High">High Priority / Urgent</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block font-bold text-slate-500 mb-1">Message</label>
+                        <textarea v-model="announcementForm.message" required rows="3" placeholder="Write announcement details..." class="w-full p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"></textarea>
+                    </div>
+                    <div class="flex justify-end">
+                        <button type="submit" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-indigo-500/20">
+                            <i class="fa-solid fa-paper-plane"></i> Publish Announcement
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Announcements List -->
+            <div class="space-y-3">
+                <div v-for="ann in announcementsList" :key="ann.id" class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 relative">
+                    <div class="flex items-center justify-between mb-1.5">
+                        <div class="flex items-center gap-2">
+                            <span :class="['px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase', ann.priority === 'High' ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400' : 'bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400']">
+                                {{ ann.priority }} Priority
+                            </span>
+                            <span class="text-[11px] font-mono text-slate-400">{{ ann.date }}</span>
+                        </div>
+                        <button v-if="currentRole === 'admin'" @click="deleteAnnouncement(ann.id)" class="text-slate-400 hover:text-rose-600 text-xs" title="Delete Announcement"><i class="fa-solid fa-trash"></i></button>
+                    </div>
+                    <h4 class="text-sm font-bold font-heading text-slate-900 dark:text-white">{{ ann.title }}</h4>
+                    <p class="text-xs text-slate-600 dark:text-slate-300 mt-1 leading-relaxed whitespace-pre-line">{{ ann.message }}</p>
+                    <span class="text-[10px] text-slate-400 block mt-2 italic">Posted by: {{ ann.author || 'Administrator' }}</span>
+                </div>
+                <p v-if="!announcementsList.length" class="text-xs text-slate-400 text-center py-8">No announcements found.</p>
+            </div>
         </div>
     </div>
 
