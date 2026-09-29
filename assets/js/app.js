@@ -3,7 +3,7 @@
  * ARK Shipping Line
  */
 
-const { createApp, ref, reactive, computed, onMounted, onUnmounted, nextTick } = Vue;
+const { createApp, ref, reactive, computed, watch, onMounted, onUnmounted, nextTick } = Vue;
 
 const app = createApp({
     setup() {
