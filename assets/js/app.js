@@ -255,7 +255,7 @@ const app = createApp({
         const empFilter = reactive({ search: '', dept: 'All', status: 'All' });
         const leaveFilterStatus = ref('All');
 
-        // State Persistence
+        // State Persistence & Reactive Watchers
         function persistState() {
             try {
                 localStorage.setItem('ark_employees', JSON.stringify(employees.value));
@@ -265,6 +265,12 @@ const app = createApp({
                 localStorage.setItem('ark_notifications', JSON.stringify(notifications.value));
             } catch (e) {}
         }
+
+        watch(employees, () => persistState(), { deep: true });
+        watch(leaves, () => persistState(), { deep: true });
+        watch(timesheets, () => persistState(), { deep: true });
+        watch(departments, () => persistState(), { deep: true });
+        watch(notifications, () => persistState(), { deep: true });
 
         function showToast(message, type = 'success', title = '') {
             if (toastTimeout) clearTimeout(toastTimeout);
@@ -1460,12 +1466,43 @@ const app = createApp({
 
 
 
-        // ── Enterprise PDF Reports ─────────────────────────────────────────────
+        // ── Comprehensive & Enterprise PDF Reports ────────────────────────────
+        const reportDateMode = ref('month'); // 'month' or 'custom'
+        const reportStartDate = ref(new Date().toISOString().slice(0, 10));
+        const reportEndDate = ref(new Date().toISOString().slice(0, 10));
+        const reportScope = ref('all'); // 'all', 'individual', 'subordinates'
+        const reportSelectedEmpId = ref('');
         const reportMonth = ref((() => { const d = new Date(); return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`; })());
         const reportDossierEmpId = ref('');
 
+        function matchesReportDate(dateStr) {
+            if (!dateStr) return false;
+            const d = new Date(dateStr);
+            if (isNaN(d.getTime())) return false;
+            if (reportDateMode.value === 'month') {
+                const [yr, mo] = reportMonth.value.split('-').map(Number);
+                return d.getFullYear() === yr && (d.getMonth() + 1) === mo;
+            } else {
+                const start = reportStartDate.value ? new Date(reportStartDate.value) : new Date(0);
+                const end = reportEndDate.value ? new Date(reportEndDate.value + 'T23:59:59') : new Date();
+                return d >= start && d <= end;
+            }
+        }
+
+        function matchesReportEmployee(empId) {
+            const sId = String(empId);
+            if (reportScope.value === 'individual') {
+                return reportSelectedEmpId.value && sId === String(reportSelectedEmpId.value);
+            } else if (reportScope.value === 'subordinates' && isUserManager.value) {
+                const subIds = userSubordinates.value.map(s => String(s.id));
+                return subIds.includes(sId) || (currentUser.value && sId === String(currentUser.value.id));
+            } else {
+                return true;
+            }
+        }
+
         function exportAttendancePDF() {
-            showLoading('Generating Workforce Attendance PDF...');
+            showLoading('Generating Comprehensive Attendance Report PDF...');
             setTimeout(() => {
                 try {
                     const { jsPDF } = window.jspdf || {};
@@ -1475,15 +1512,17 @@ const app = createApp({
                         return;
                     }
                     const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
-                    const [yr, mo] = reportMonth.value.split('-').map(Number);
-                    const moLabel = new Date(yr, mo - 1, 1).toLocaleString('en-US', { month: 'long', year: 'numeric' });
 
-                    const filtered = timesheets.value.filter(t => {
-                        if (!t.date) return false;
-                        const d = new Date(t.date);
-                        return d.getFullYear() === yr && (d.getMonth() + 1) === mo;
-                    });
-                    const targetList = filtered.length ? filtered : timesheets.value;
+                    let periodLabel = '';
+                    if (reportDateMode.value === 'month') {
+                        const [yr, mo] = reportMonth.value.split('-').map(Number);
+                        periodLabel = new Date(yr, mo - 1, 1).toLocaleString('en-US', { month: 'long', year: 'numeric' });
+                    } else {
+                        periodLabel = `${reportStartDate.value || 'Start'} to ${reportEndDate.value || 'End'}`;
+                    }
+
+                    const filtered = timesheets.value.filter(t => matchesReportDate(t.date) && matchesReportEmployee(t.empId));
+                    const targetList = filtered;
                     const totalLogs = targetList.length;
                     const onTimeCount = targetList.filter(t => t.punctuality !== 'Late Arrival').length;
                     const lateCount = targetList.filter(t => t.punctuality === 'Late Arrival').length;
@@ -1501,23 +1540,23 @@ const app = createApp({
                     doc.setFont('helvetica', 'normal');
                     doc.setFontSize(9);
                     doc.setTextColor(197, 220, 254);
-                    doc.text('HUMAN RESOURCES MANAGEMENT SYSTEM · EXECUTIVE WORKFORCE AUDIT', 32, 45);
+                    doc.text('HUMAN RESOURCES MANAGEMENT SYSTEM · COMPREHENSIVE ATTENDANCE AUDIT', 32, 45);
 
                     doc.setTextColor(255, 255, 255);
                     doc.setFontSize(10);
                     doc.setFont('helvetica', 'bold');
-                    doc.text(`PERIOD: ${moLabel.toUpperCase()}`, 810, 36, { align: 'right' });
+                    doc.text(`PERIOD: ${periodLabel.toUpperCase()}`, 810, 36, { align: 'right' });
 
                     // Section Heading
                     doc.setTextColor(30, 41, 59);
                     doc.setFontSize(13);
                     doc.setFont('helvetica', 'bold');
-                    doc.text('Monthly Shift Performance & Punctuality Record', 32, 86);
+                    doc.text(`Detailed Shift Check-In / Out Record (${reportScope.value === 'individual' ? 'Individual Employee' : reportScope.value === 'subordinates' ? 'Team / Subordinates' : 'All Employees'})`, 32, 86);
 
                     doc.setFontSize(8.5);
                     doc.setFont('helvetica', 'normal');
                     doc.setTextColor(100, 116, 139);
-                    doc.text(`Generated: ${new Date().toLocaleString()} (NJ Time) · Certified by: ${currentUser.value ? currentUser.value.name : 'Super Administrator'} · ARK HR Compliance`, 32, 100);
+                    doc.text(`Generated: ${new Date().toLocaleString()} (NJ Time) · Certified by: ${currentUser.value ? currentUser.value.name : 'Administrator'} · ARK HR Compliance`, 32, 100);
 
                     // 4 KPI Summary Cards
                     const drawCard = (x, y, w, h, title, val, color) => {
@@ -1536,7 +1575,7 @@ const app = createApp({
                     drawCard(32, 112, 178, 46, 'Total Events Recorded', totalLogs, [37, 99, 235]);
                     drawCard(224, 112, 178, 46, 'Punctuality Compliance', `${onTimePct}%`, [16, 185, 129]);
                     drawCard(416, 112, 178, 46, 'Late Arrivals Recorded', lateCount, [225, 29, 72]);
-                    drawCard(608, 112, 202, 46, 'Active Headcount', `${employees.value.length} Staff Members`, [124, 58, 237]);
+                    drawCard(608, 112, 202, 46, 'Scope / Target', reportScope.value === 'individual' ? (employees.value.find(e=>String(e.id)===String(reportSelectedEmpId.value))?.name || 'Selected') : 'Organization-Wide', [124, 58, 237]);
 
                     // Attendance Rows
                     const rows = targetList.map(t => [
@@ -1553,7 +1592,7 @@ const app = createApp({
                     doc.autoTable({
                         startY: 170,
                         head: [['Date', 'Emp ID', 'Employee Name', 'Department', 'Logged Action', 'Time', 'Shift Hours', 'Punctuality']],
-                        body: rows,
+                        body: rows.length ? rows : [['—', '—', 'No attendance records found for criteria', '—', '—', '—', '—', '—']],
                         theme: 'striped',
                         headStyles: { fillColor: [12, 26, 75], textColor: 255, fontStyle: 'bold', fontSize: 8.5 },
                         styles: { font: 'helvetica', fontSize: 8, cellPadding: 4, textColor: [30, 41, 59] },
@@ -1581,8 +1620,8 @@ const app = createApp({
                         doc.text(`Page ${i} of ${pageCount}`, 810, 574, { align: 'right' });
                     }
 
-                    doc.save(`ARK_Attendance_Report_${moLabel.replace(/\s+/g, '_')}.pdf`);
-                    showToast('Workforce Attendance PDF exported successfully!', 'success');
+                    doc.save(`ARK_Attendance_Report_${periodLabel.replace(/\s+/g, '_')}.pdf`);
+                    showToast('Comprehensive Attendance Report exported successfully!', 'success');
                 } catch (err) {
                     console.error('[exportAttendancePDF]', err);
                     showToast('PDF Export Error: ' + err.message, 'error');
@@ -1593,7 +1632,7 @@ const app = createApp({
         }
 
         function exportLeavesPDF() {
-            showLoading('Generating Leaves & Approvals Audit PDF...');
+            showLoading('Generating Comprehensive Leaves Audit PDF...');
             setTimeout(() => {
                 try {
                     const { jsPDF } = window.jspdf || {};
@@ -1603,13 +1642,20 @@ const app = createApp({
                         return;
                     }
                     const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
-                    const [yr, mo] = reportMonth.value.split('-').map(Number);
-                    const moLabel = new Date(yr, mo - 1, 1).toLocaleString('en-US', { month: 'long', year: 'numeric' });
 
-                    const totalReqs = leaves.value.length;
-                    const approvedCount = leaves.value.filter(l => l.status === 'Approved').length;
-                    const pendingCount = leaves.value.filter(l => l.status === 'Pending' || l.status === 'ManagerApproved').length;
-                    const rejectedCount = leaves.value.filter(l => l.status === 'Rejected').length;
+                    let periodLabel = '';
+                    if (reportDateMode.value === 'month') {
+                        const [yr, mo] = reportMonth.value.split('-').map(Number);
+                        periodLabel = new Date(yr, mo - 1, 1).toLocaleString('en-US', { month: 'long', year: 'numeric' });
+                    } else {
+                        periodLabel = `${reportStartDate.value || 'Start'} to ${reportEndDate.value || 'End'}`;
+                    }
+
+                    const filteredLeaves = leaves.value.filter(l => matchesReportDate(l.from) && matchesReportEmployee(l.empId));
+                    const totalReqs = filteredLeaves.length;
+                    const approvedCount = filteredLeaves.filter(l => l.status === 'Approved').length;
+                    const pendingCount = filteredLeaves.filter(l => l.status === 'Pending' || l.status === 'ManagerApproved').length;
+                    const rejectedCount = filteredLeaves.filter(l => l.status === 'Rejected').length;
 
                     // Brand Navy Header
                     doc.setFillColor(12, 26, 75);
@@ -1628,18 +1674,18 @@ const app = createApp({
                     doc.setTextColor(255, 255, 255);
                     doc.setFontSize(10);
                     doc.setFont('helvetica', 'bold');
-                    doc.text(`PERIOD: ${moLabel.toUpperCase()}`, 810, 36, { align: 'right' });
+                    doc.text(`PERIOD: ${periodLabel.toUpperCase()}`, 810, 36, { align: 'right' });
 
                     // Section Heading
                     doc.setTextColor(30, 41, 59);
                     doc.setFontSize(13);
                     doc.setFont('helvetica', 'bold');
-                    doc.text('Leave Requests, Multi-Level Workflow & Decisions Dossier', 32, 86);
+                    doc.text('Detailed Leave Requests, Multi-Level Workflow & Decisions Dossier', 32, 86);
 
                     doc.setFontSize(8.5);
                     doc.setFont('helvetica', 'normal');
                     doc.setTextColor(100, 116, 139);
-                    doc.text(`Generated: ${new Date().toLocaleString()} (NJ Time) · Authorized: ${currentUser.value ? currentUser.value.name : 'Super Administrator'}`, 32, 100);
+                    doc.text(`Generated: ${new Date().toLocaleString()} (NJ Time) · Authorized: ${currentUser.value ? currentUser.value.name : 'Administrator'}`, 32, 100);
 
                     // Summary KPI Cards
                     const drawCard = (x, y, w, h, title, val, color) => {
@@ -1655,12 +1701,12 @@ const app = createApp({
                         doc.text(String(val), x + 10, y + 36);
                     };
 
-                    drawCard(32, 112, 178, 46, 'Total Leave Requests', totalReqs, [37, 99, 235]);
+                    drawCard(32, 112, 178, 46, 'Filtered Leave Requests', totalReqs, [37, 99, 235]);
                     drawCard(224, 112, 178, 46, 'Fully Approved', approvedCount, [16, 185, 129]);
                     drawCard(416, 112, 178, 46, 'In Approval Queue', pendingCount, [245, 158, 11]);
                     drawCard(608, 112, 202, 46, 'Rejected Requests', rejectedCount, [225, 29, 72]);
 
-                    const rows = leaves.value.map(l => [
+                    const rows = filteredLeaves.map(l => [
                         l.id || '—',
                         l.empId || '—',
                         l.empName || '—',
@@ -1676,7 +1722,7 @@ const app = createApp({
                     doc.autoTable({
                         startY: 170,
                         head: [['Req ID', 'ID', 'Employee', 'Type', 'Period', 'Days', 'Reason', '1st Level (Mgr)', '2nd Level (Admin)', 'Status']],
-                        body: rows,
+                        body: rows.length ? rows : [['—', '—', 'No leave records found for criteria', '—', '—', '—', '—', '—', '—', '—']],
                         theme: 'striped',
                         headStyles: { fillColor: [12, 26, 75], textColor: 255, fontStyle: 'bold', fontSize: 8 },
                         styles: { font: 'helvetica', fontSize: 7.5, cellPadding: 3.5, textColor: [30, 41, 59] },
@@ -1704,8 +1750,8 @@ const app = createApp({
                         doc.text(`Page ${i} of ${pageCount}`, 810, 574, { align: 'right' });
                     }
 
-                    doc.save(`ARK_Leaves_Audit_Report_${moLabel.replace(/\s+/g, '_')}.pdf`);
-                    showToast('Leaves Audit PDF exported successfully!', 'success');
+                    doc.save(`ARK_Leaves_Audit_Report_${periodLabel.replace(/\s+/g, '_')}.pdf`);
+                    showToast('Comprehensive Leaves Audit PDF exported successfully!', 'success');
                 } catch (err) {
                     console.error('[exportLeavesPDF]', err);
                     showToast('PDF Export Error: ' + err.message, 'error');
@@ -1713,6 +1759,22 @@ const app = createApp({
                     hideLoading();
                 }
             }, 300);
+        }
+
+        function exportManagerTeamPDF() {
+            if (!isUserManager.value) {
+                showToast('Manager access required', 'error');
+                return;
+            }
+            reportScope.value = 'subordinates';
+            exportAttendancePDF();
+        }
+
+        function exportMyReportPDF() {
+            if (!currentUser.value) return;
+            reportScope.value = 'individual';
+            reportSelectedEmpId.value = currentUser.value.id;
+            exportAttendancePDF();
         }
 
         function exportRosterPDF() {
@@ -2173,6 +2235,7 @@ const app = createApp({
             shiftProgress, liveShiftMetrics, viewedEmployee, viewedEmployeeTimesheets, viewedEmployeeLeaves, topPerformers,
             isSubmittingLeave, liveNow, selectedRosterMonth, selectedRosterEmpId, rosterViewMode, availableMonths,
             monthlyRosterData, rosterEmpOptions, rosterSelectedEmpLeaves, reportMonth, reportDossierEmpId,
+            reportDateMode, reportStartDate, reportEndDate, reportScope, reportSelectedEmpId,
             dailyQuote, fetchDailyQuote,
             toggleDarkMode, handleLogin, logout, switchAdminNav, switchEmpTab,
             syncFromSupabase, saveSupabaseCredentials, testSupabaseConnection, downloadJsonBackup, resetWorkspaceData,
@@ -2181,6 +2244,7 @@ const app = createApp({
             openAddDepartmentModal, saveDepartmentSubmit, adminFinalDecide, managerDecideLeave,
             openApplyLeaveModal, submitApplyLeave, empPunchAction, isPunchDisabled,
             exportAttendancePDF, exportLeavesPDF, exportRosterPDF, exportEmployeeDossierPDF,
+            exportManagerTeamPDF, exportMyReportPDF,
             clearNotifications,
             getBadgeClasses, formatDateNice, getLeaveAuditBadge, isManager, getEmployeeManager, getEmployeeManagerName,
             canAdminDecideLeave, formatSecondsHms, formatSecondsPretty, pad2

@@ -717,6 +717,53 @@
                     <!-- ENTERPRISE PDF REPORT EXPORTS -->
                     <!-- ══════════════════════════════════════════════════════ -->
 
+                    <!-- Comprehensive Reporting Filters Card -->
+                    <div class="glass-card p-5 sm:p-6 rounded-3xl border-2 border-indigo-500/20 bg-indigo-500/5">
+                        <h4 class="text-base font-bold font-heading text-slate-900 dark:text-white flex items-center gap-2 mb-3">
+                            <span class="w-8 h-8 rounded-xl bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 flex items-center justify-center"><i class="fa-solid fa-sliders text-sm"></i></span>
+                            Comprehensive Report Filters & Parameters
+                        </h4>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+                            <div>
+                                <label class="block font-bold uppercase text-slate-500 mb-1">Date Range Mode</label>
+                                <select v-model="reportDateMode" class="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-bold text-slate-700 dark:text-slate-200">
+                                    <option value="month">Monthly Selection</option>
+                                    <option value="custom">Custom Date Range</option>
+                                </select>
+                            </div>
+                            <div v-if="reportDateMode === 'month'">
+                                <label class="block font-bold uppercase text-slate-500 mb-1">Select Month</label>
+                                <select v-model="reportMonth" class="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-bold text-slate-700 dark:text-slate-200">
+                                    <option v-for="m in availableMonths" :key="m.value" :value="m.value">{{ m.label }}</option>
+                                </select>
+                            </div>
+                            <template v-else>
+                                <div>
+                                    <label class="block font-bold uppercase text-slate-500 mb-1">Start Date</label>
+                                    <input type="date" v-model="reportStartDate" class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-bold text-slate-700 dark:text-slate-200">
+                                </div>
+                                <div>
+                                    <label class="block font-bold uppercase text-slate-500 mb-1">End Date</label>
+                                    <input type="date" v-model="reportEndDate" class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-bold text-slate-700 dark:text-slate-200">
+                                </div>
+                            </template>
+                            <div>
+                                <label class="block font-bold uppercase text-slate-500 mb-1">Employee Scope</label>
+                                <select v-model="reportScope" class="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-bold text-slate-700 dark:text-slate-200">
+                                    <option value="all">All Employees (Organization-Wide)</option>
+                                    <option value="individual">Individual Employee</option>
+                                </select>
+                            </div>
+                            <div v-if="reportScope === 'individual'" class="sm:col-span-3">
+                                <label class="block font-bold uppercase text-slate-500 mb-1">Select Individual Employee</label>
+                                <select v-model="reportSelectedEmpId" class="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-bold text-slate-700 dark:text-slate-200">
+                                    <option value="">— Select Employee —</option>
+                                    <option v-for="e in employees" :key="e.id" :value="e.id">{{ e.name }} · {{ e.dept }} (ID: {{ e.id }})</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Month Selector + Period Reports -->
                     <div class="glass-card p-5 sm:p-6 rounded-3xl">
                         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5">
@@ -726,12 +773,6 @@
                                     Period-Based PDF Reports
                                 </h4>
                                 <p class="text-xs text-slate-500 mt-0.5 ml-10">Select reporting period and export branded enterprise-grade PDF documents.</p>
-                            </div>
-                            <div class="flex items-center gap-2">
-                                <label class="text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Report Month:</label>
-                                <select v-model="reportMonth" class="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                    <option v-for="m in availableMonths" :key="m.value" :value="m.value">{{ m.label }}</option>
-                                </select>
                             </div>
                         </div>
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1249,6 +1290,22 @@
                         </div>
                     </div>
 
+                    <!-- Manager Team Reports Card -->
+                    <div v-if="isUserManager" class="glass-card p-5 sm:p-6 rounded-3xl border-2 border-amber-500/30 mb-6">
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                            <div>
+                                <h4 class="text-base font-bold font-heading text-slate-900 dark:text-white flex items-center gap-2">
+                                    <span class="w-8 h-8 rounded-xl bg-amber-100 dark:bg-amber-900/40 text-amber-600 flex items-center justify-center"><i class="fa-solid fa-file-pdf text-sm"></i></span>
+                                    Team & Subordinates Reports
+                                </h4>
+                                <p class="text-xs text-slate-500 mt-0.5 ml-10">Export attendance and shift logs for all your direct reports and subordinates.</p>
+                            </div>
+                            <button @click="exportManagerTeamPDF" class="px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold flex items-center gap-2 shadow-md shadow-amber-500/25 transition-all">
+                                <i class="fa-solid fa-download"></i> Download Team Report PDF
+                            </button>
+                        </div>
+                    </div>
+
                     <!-- Manager View: Subordinates Grid -->
                     <div v-if="isUserManager" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                         <p v-if="!userSubordinates.length" class="col-span-full p-8 text-center text-slate-400 glass-card rounded-3xl">No direct subordinates assigned to you yet.</p>
@@ -1432,6 +1489,22 @@
                             <div class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50">
                                 <span class="text-[11px] text-slate-400 font-bold uppercase block">Department</span>
                                 <span class="text-sm font-extrabold text-slate-800 dark:text-white mt-1 block">{{ currentUser.dept }}</span>
+                            </div>
+                        </div>
+
+                        <!-- Personal Report Download Card -->
+                        <div class="mt-6 pt-6 border-t border-slate-200/80 dark:border-slate-800">
+                            <h4 class="text-sm font-bold font-heading text-slate-900 dark:text-white mb-3 flex items-center gap-2">
+                                <i class="fa-solid fa-file-arrow-down text-blue-600"></i> My Personal Reports & Downloads
+                            </h4>
+                            <div class="flex flex-col sm:flex-row items-center justify-between p-4 rounded-2xl bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200/50 dark:border-blue-800/40 text-xs gap-3">
+                                <div>
+                                    <p class="font-bold text-slate-900 dark:text-white">Download Your Attendance & Check-In History</p>
+                                    <p class="text-[11px] text-slate-500 mt-0.5">Export a certified PDF record of all your shift punches, hours, and leave history.</p>
+                                </div>
+                                <button @click="exportMyReportPDF" class="flex-shrink-0 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold flex items-center gap-2 shadow-md shadow-blue-500/20">
+                                    <i class="fa-solid fa-file-pdf"></i> Download My Report
+                                </button>
                             </div>
                         </div>
 
