@@ -36,17 +36,31 @@ const ChartManager = {
         };
     },
 
-    renderWeeklyTrend(canvasId, isDark) {
+    renderWeeklyTrend(canvasId, timesheets = [], employees = [], isDark = false) {
         const canvas = document.getElementById(canvasId);
         if (!canvas || typeof Chart === 'undefined') return;
         this.destroy('weeklyTrend');
         const theme = this.getTheme(isDark);
+
+        // Dynamically compute last 7 days attendance %
+        const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+        const totalStaff = Math.max(1, employees.filter(e => e.status !== 'Inactive').length);
+        const dynamicData = days.map((d, idx) => {
+            const dayTimesheets = timesheets.filter(t => {
+                if (!t.date) return false;
+                const date = new Date(t.date);
+                return (date.getDay() + 6) % 7 === idx; // 0=Mon, 6=Sun
+            });
+            const uniqueEmps = new Set(dayTimesheets.map(t => String(t.empId))).size;
+            return uniqueEmps > 0 ? Math.min(100, Math.round((uniqueEmps / totalStaff) * 100)) : (idx < 5 ? 100 : 0);
+        });
+
         this.instances.weeklyTrend = new Chart(canvas, {
             type: 'line',
             data: {
-                labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+                labels: days,
                 datasets: [
-                    { label: 'Present %', data: [96, 92, 94, 98, 91, 45, 30], borderColor: '#2563eb', backgroundColor: 'rgba(37,99,235,0.12)', fill: true, tension: 0.4, pointBackgroundColor: '#fff', pointBorderColor: '#2563eb', pointBorderWidth: 2, pointRadius: 4, borderWidth: 2.5 },
+                    { label: 'Present %', data: dynamicData, borderColor: '#2563eb', backgroundColor: 'rgba(37,99,235,0.12)', fill: true, tension: 0.4, pointBackgroundColor: '#fff', pointBorderColor: '#2563eb', pointBorderWidth: 2, pointRadius: 4, borderWidth: 2.5 },
                     { label: 'Target', data: [90, 90, 90, 90, 90, 90, 90], borderColor: '#94a3b8', borderDash: [5, 5], pointRadius: 0, borderWidth: 1.5 }
                 ]
             },
@@ -56,7 +70,7 @@ const ChartManager = {
                 plugins: { legend: theme.legendOpts },
                 scales: {
                     x: { grid: { display: false }, ticks: { color: theme.textColor } },
-                    y: { min: 20, max: 100, grid: { color: theme.gridColor }, ticks: { color: theme.textColor, callback: v => `${v}%` } }
+                    y: { min: 0, max: 100, grid: { color: theme.gridColor }, ticks: { color: theme.textColor, callback: v => `${v}%` } }
                 }
             }
         });
@@ -229,19 +243,27 @@ const ChartManager = {
         });
     },
 
-    renderMonthlyAttendance(canvasId, isDark) {
+    renderMonthlyAttendance(canvasId, timesheets = [], employees = [], isDark = false) {
         const canvas = document.getElementById(canvasId);
         if (!canvas || typeof Chart === 'undefined') return;
         this.destroy('monthlyAttendance');
         const theme = this.getTheme(isDark);
 
+        const totalStaff = Math.max(1, employees.filter(e => e.status !== 'Inactive').length);
+        const days = Array.from({ length: 15 }, (_, i) => `${i + 1}`);
+        const dynamicData = days.map((d, idx) => {
+            const dayTs = timesheets.filter(t => t.date && parseInt(t.date.split('-')[2], 10) === (idx + 1));
+            const uniqueEmps = new Set(dayTs.map(t => String(t.empId))).size;
+            return uniqueEmps > 0 ? Math.min(100, Math.round((uniqueEmps / totalStaff) * 100)) : 100;
+        });
+
         this.instances.monthlyAttendance = new Chart(canvas, {
             type: 'line',
             data: {
-                labels: Array.from({ length: 15 }, (_, i) => `${i + 1}`),
+                labels: days,
                 datasets: [{
                     label: 'Attendance %',
-                    data: [94, 91, 96, 93, 95, 88, 42, 90, 97, 94, 92, 95, 89, 93, 96],
+                    data: dynamicData,
                     borderColor: '#2563eb',
                     backgroundColor: 'rgba(37,99,235,0.12)',
                     fill: true,
@@ -256,7 +278,7 @@ const ChartManager = {
                 plugins: { legend: { display: false } },
                 scales: {
                     x: { grid: { display: false }, ticks: { color: theme.textColor, maxTicksLimit: 8 } },
-                    y: { min: 30, max: 100, grid: { color: theme.gridColor }, ticks: { color: theme.textColor, callback: v => `${v}%` } }
+                    y: { min: 0, max: 100, grid: { color: theme.gridColor }, ticks: { color: theme.textColor, callback: v => `${v}%` } }
                 }
             }
         });

@@ -242,7 +242,8 @@ const app = createApp({
             viewProfile: false,
             password: false,
             announcement: false,
-            adminLeave: false
+            adminLeave: false,
+            evalPopup: false
         });
 
         // Form Models
@@ -2403,19 +2404,113 @@ const app = createApp({
             }
         }
 
+        // ── Monthly PER (Performance Evaluation & Rating) System ───────────
+        const performanceRatings = ref(JSON.parse(localStorage.getItem('ark_performance_ratings')) || []);
+        watch(performanceRatings, () => localStorage.setItem('ark_performance_ratings', JSON.stringify(performanceRatings.value)), { deep: true });
+
+        const currentEvalMonth = computed(() => getNJDateString().slice(0, 7)); // 'YYYY-MM' e.g. '2026-09'
+
+        const pendingRatings = computed(() => {
+            if (!currentUser.value) return [];
+            const monthKey = currentEvalMonth.value;
+            let targetList = [];
+
+            if (currentRole.value === 'admin') {
+                targetList = employees.value.filter(e => String(e.id) !== '1');
+            } else if (isUserManager.value) {
+                targetList = userSubordinates.value;
+            } else {
+                return [];
+            }
+
+            return targetList.filter(e => {
+                return !performanceRatings.value.some(r => String(r.empId) === String(e.id) && r.month === monthKey && String(r.raterId) === String(currentUser.value.id));
+            });
+        });
+
+        const evalRatingForm = reactive({});
+
+        function openEvalModal() {
+            pendingRatings.value.forEach(e => {
+                if (!evalRatingForm[e.id]) {
+                    evalRatingForm[e.id] = { rating: 5, feedback: '' };
+                }
+            });
+            modals.evalPopup = true;
+        }
+
+        function submitEmployeeRating(empId) {
+            const emp = employees.value.find(e => String(e.id) === String(empId));
+            if (!emp) return;
+            const form = evalRatingForm[empId] || { rating: 5, feedback: 'Good performance' };
+            const monthKey = currentEvalMonth.value;
+
+            const existingIdx = performanceRatings.value.findIndex(r => String(r.empId) === String(empId) && r.month === monthKey && String(r.raterId) === String(currentUser.value.id));
+            const newRecord = {
+                id: 'PER-' + Date.now(),
+                empId: String(emp.id),
+                empName: emp.name,
+                raterId: String(currentUser.value.id),
+                raterName: currentUser.value.name,
+                month: monthKey,
+                rating: Number(form.rating) || 5,
+                feedback: String(form.feedback || '').trim() || 'Good performance',
+                date: getNJDateString()
+            };
+
+            if (existingIdx >= 0) {
+                performanceRatings.value[existingIdx] = newRecord;
+            } else {
+                performanceRatings.value.unshift(newRecord);
+            }
+            persistState();
+            showToast(`Submitted ${form.rating} ★ PER rating for ${emp.name}`, 'success');
+
+            if (pendingRatings.value.length === 0) {
+                modals.evalPopup = false;
+            }
+        }
+
+        // Dynamic Top Performers derived from PER ratings & punctuality
         const topPerformers = computed(() => {
-            return [...employees.value].filter(e => e.status !== 'On Leave').slice(0, 5);
+            return employees.value
+                .filter(e => e.status !== 'Inactive')
+                .map(e => {
+                    const empRatings = performanceRatings.value.filter(r => String(r.empId) === String(e.id));
+                    let avgRating = 4.5;
+                    if (empRatings.length > 0) {
+                        avgRating = empRatings.reduce((s, r) => s + Number(r.rating || 5), 0) / empRatings.length;
+                    }
+                    const empTs = timesheets.value.filter(t => String(t.empId) === String(e.id));
+                    let punctualityPct = 100;
+                    if (empTs.length > 0) {
+                        const onTime = empTs.filter(t => t.punctuality !== 'Late Arrival').length;
+                        punctualityPct = Math.round((onTime / empTs.length) * 100);
+                    }
+                    const scorePct = Math.min(100, Math.round((avgRating / 5) * 80 + (punctualityPct / 100) * 20));
+
+                    return {
+                        id: e.id,
+                        name: e.name,
+                        dept: e.dept,
+                        avatar: e.avatar,
+                        avgRating: Math.round(avgRating * 10) / 10,
+                        scorePct
+                    };
+                })
+                .sort((a, b) => b.scorePct - a.scorePct)
+                .slice(0, 5);
         });
 
         function renderAllCharts() {
             if (currentRole.value === 'admin') {
-                ChartManager.renderWeeklyTrend('chart-admin-weekly-trend', isDarkMode.value);
+                ChartManager.renderWeeklyTrend('chart-admin-weekly-trend', timesheets.value, employees.value, isDarkMode.value);
                 ChartManager.renderPresenceDonut('chart-admin-presence-donut', employees.value, isDarkMode.value);
                 ChartManager.renderDeptHeadcount('chart-dept-headcount', departmentList.value, employees.value, isDarkMode.value);
                 ChartManager.renderLeaveTypes('chart-leave-types', 'leave-type-legend', leaves.value, isDarkMode.value);
                 ChartManager.renderAttPunctuality('chart-att-punctuality', 'donut-att-ontime', timesheets.value, isDarkMode.value);
                 ChartManager.renderAttHours('chart-att-hours', timesheets.value, isDarkMode.value);
-                ChartManager.renderMonthlyAttendance('chart-monthly-attendance', isDarkMode.value);
+                ChartManager.renderMonthlyAttendance('chart-monthly-attendance', timesheets.value, employees.value, isDarkMode.value);
             }
         }
 
@@ -2450,6 +2545,13 @@ const app = createApp({
                     localStorage.removeItem('ark_session');
                 }
             }
+
+            // Auto prompt monthly PER evaluation modal if ratings are pending for Admin/Manager
+            setTimeout(() => {
+                if ((currentRole.value === 'admin' || isUserManager.value) && pendingRatings.value.length > 0) {
+                    openEvalModal();
+                }
+            }, 1200);
 
             // ── Cross-tab session sync ───────────────────────────────────────
             // If another tab logs in or out, reload this tab to get a clean state
@@ -2498,7 +2600,7 @@ const app = createApp({
             adminLeaveForm, openAdminAddLeaveModal, submitAdminAddLeave, clearTestRecords,
             exportAttendancePDF, exportLeavesPDF, exportRosterPDF, exportEmployeeDossierPDF,
             exportManagerTeamPDF, exportMyReportPDF,
-            passwordForm, announcementForm, announcementsList,
+            performanceRatings, pendingRatings, currentEvalMonth, evalRatingForm, openEvalModal, submitEmployeeRating,
             openChangePasswordModal, submitChangePassword, openAnnouncementsModal, postAnnouncement, deleteAnnouncement,
             clearNotifications,
             getBadgeClasses, formatDateNice, getLeaveAuditBadge, isManager, getEmployeeManager, getEmployeeManagerName,
