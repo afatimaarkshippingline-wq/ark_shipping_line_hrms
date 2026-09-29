@@ -1712,9 +1712,15 @@
                         <input type="text" v-model="empForm.managerId" placeholder="e.g. 1 (Admin) or 101" class="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs sm:text-sm">
                     </div>
                 </div>
-                <div>
-                    <label class="block text-xs font-bold uppercase text-slate-500 mb-1">Password <span class="text-slate-400 normal-case">(blank = default 123456)</span></label>
-                    <input type="text" v-model="empForm.password" placeholder="123456" class="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs sm:text-sm">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold uppercase text-slate-500 mb-1">Password <span class="text-slate-400 normal-case">(blank = default 123456)</span></label>
+                        <input type="text" v-model="empForm.password" placeholder="123456" class="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs sm:text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold uppercase text-slate-500 mb-1">Avatar / Picture URL</label>
+                        <input type="text" v-model="empForm.avatar" placeholder="👨‍💼 or assets/img/... or URL" class="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs sm:text-sm font-mono">
+                    </div>
                 </div>
                 <!-- Custom Leave Allowances Per Employee -->
                 <div class="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-2">
@@ -1894,6 +1900,20 @@
                 <button @click="modals.editProfile = false" class="w-7 h-7 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 flex items-center justify-center"><i class="fa-solid fa-xmark text-xs"></i></button>
             </div>
             <form @submit.prevent="saveProfileInfo" class="space-y-3 text-xs sm:text-sm">
+                <!-- Avatar Preview & Change Trigger -->
+                <div class="flex items-center gap-3 p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
+                    <span class="w-12 h-12 rounded-2xl bg-blue-100 dark:bg-blue-900/40 text-blue-600 flex items-center justify-center text-2xl overflow-hidden shadow-sm">
+                        <img v-if="isAvatarImage(currentUser.avatar)" :src="currentUser.avatar" alt="Avatar" class="w-full h-full object-cover">
+                        <span v-else>{{ currentUser.avatar || '👨‍💼' }}</span>
+                    </span>
+                    <div class="flex-1 min-w-0">
+                        <p class="font-bold text-xs text-slate-800 dark:text-white">Profile Avatar / Picture</p>
+                        <p class="text-[10px] text-slate-400">Choose emoji avatar or custom image URL</p>
+                    </div>
+                    <button type="button" @click="openAvatarPicker" class="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md">
+                        Change Picture
+                    </button>
+                </div>
                 <div><label class="block text-slate-500 font-semibold mb-1">Name</label><input type="text" v-model="profileForm.name" required class="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800"></div>
                 <div><label class="block text-slate-500 font-semibold mb-1">Email</label><input type="email" v-model="profileForm.email" required class="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800"></div>
                 <div><label class="block text-slate-500 font-semibold mb-1">Designation</label><input type="text" v-model="profileForm.role" required class="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800"></div>

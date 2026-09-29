@@ -248,7 +248,7 @@ const app = createApp({
         // Form Models
         const loginForm = reactive({ empId: '', password: '', showPassword: false });
         const empForm = reactive({
-            id: '', name: '', email: '', dept: 'Accounts', role: '', status: 'Active', managerId: '', password: '',
+            id: '', name: '', email: '', dept: 'Accounts', role: '', status: 'Active', managerId: '', password: '', avatar: '👨‍💼',
             leaveQuotaAnnual: 14, leaveQuotaSick: 7, leaveQuotaCasual: 5
         });
         const leaveForm = reactive({ type: 'Annual Leave', from: '', to: '', reason: '' });
@@ -876,6 +876,7 @@ const app = createApp({
             empForm.status = 'Active';
             empForm.managerId = '';
             empForm.password = '';
+            empForm.avatar = '👨‍💼';
             empForm.leaveQuotaAnnual = 14;
             empForm.leaveQuotaSick = 7;
             empForm.leaveQuotaCasual = 5;
@@ -893,6 +894,7 @@ const app = createApp({
             empForm.status = emp.status;
             empForm.managerId = emp.managerId || '';
             empForm.password = '';
+            empForm.avatar = emp.avatar || '👨‍💼';
             empForm.leaveQuotaAnnual = emp.leaveQuotas?.annual ?? 14;
             empForm.leaveQuotaSick = emp.leaveQuotas?.sick ?? 7;
             empForm.leaveQuotaCasual = emp.leaveQuotas?.casual ?? 5;
@@ -912,7 +914,7 @@ const app = createApp({
                     status: empForm.status,
                     managerId: empForm.managerId || '',
                     password: empForm.password || undefined,
-                    avatar: AVATARS[Math.floor(Math.random() * AVATARS.length)],
+                    avatar: empForm.avatar || '👨‍💼',
                     leaveQuotas: {
                         annual: Number(empForm.leaveQuotaAnnual) || 0,
                         sick: Number(empForm.leaveQuotaSick) || 0,
@@ -1345,12 +1347,17 @@ const app = createApp({
         }
 
         function clearTestRecords() {
-            if (confirm("Clear all attendance timesheets, leave applications, and notifications? Employees and departments will be kept intact for fresh client delivery.")) {
+            if (confirm("Clear all attendance timesheets, leave applications, notifications, and test logs? Employees and departments will be kept intact for fresh client delivery.")) {
                 timesheets.value = [];
                 leaves.value = [];
                 notifications.value = [];
+                mockWeeklyCheckIns.value = [];
+                localStorage.removeItem('ark_timesheets');
+                localStorage.removeItem('ark_leaves');
+                localStorage.removeItem('ark_notifications');
+                localStorage.removeItem('ark_emp_weekly_checkins');
                 persistState();
-                showToast('All test records cleared successfully! System is fresh.', 'success');
+                showToast('All dummy test records cleared! System is 100% fresh.', 'success');
             }
         }
 
