@@ -125,20 +125,6 @@ const app = createApp({
         async function fetchDailyQuote(forceFresh = false) {
             dailyQuote.loading = true;
             try {
-                const res = await fetch('https://api.quotable.io/random?_=' + Date.now());
-                if (res.ok) {
-                    const data = await res.json();
-                    if (data && data.content) {
-                        dailyQuote.text = data.content;
-                        dailyQuote.author = data.author || 'Inspirational';
-                        dailyQuote.category = data.tags && data.tags[0] ? data.tags[0].toUpperCase() : 'Daily Wisdom';
-                        dailyQuote.loading = false;
-                        return;
-                    }
-                }
-            } catch (e) {}
-
-            try {
                 const res = await fetch('https://dummyjson.com/quotes/random?_=' + Date.now());
                 if (res.ok) {
                     const data = await res.json();
@@ -151,7 +137,6 @@ const app = createApp({
                     }
                 }
             } catch (e) {}
-
             const picked = FALLBACK_QUOTES[Math.floor(Math.random() * FALLBACK_QUOTES.length)];
             dailyQuote.text = picked.text;
             dailyQuote.author = picked.author;
@@ -702,23 +687,33 @@ const app = createApp({
         });
 
         const isUserManager = computed(() => {
-            if (!currentUser.value) return false;
-            const r = (currentUser.value.designation || currentUser.value.role || '').toLowerCase();
-            if (r.includes('manager') || r.includes('lead') || r.includes('supervisor') || r.includes('head')) return true;
-            return isManager(currentUser.value.id);
+            try {
+                if (!currentUser.value) return false;
+                const r = (currentUser.value.designation || currentUser.value.role || '').toLowerCase();
+                if (r.includes('manager') || r.includes('lead') || r.includes('supervisor') || r.includes('head')) return true;
+                return isManager(currentUser.value.id);
+            } catch (e) {
+                return false;
+            }
         });
 
         const userSubordinates = computed(() => {
-            if (!currentUser.value) return [];
-            const myId = String(currentUser.value.id);
-            const myEmp = (employees.value || INITIAL_EMPLOYEES || []).find(e => String(e.id) === myId);
-            const myDept = myEmp?.dept || currentUser.value.dept;
-            return (employees.value || INITIAL_EMPLOYEES || []).filter(e => {
-                if (String(e.id) === myId) return false;
-                if (String(e.managerId) === myId) return true;
-                if (isUserManager.value && e.dept === myDept && !isManager(e.id)) return true;
-                return false;
-            });
+            try {
+                if (!currentUser.value) return [];
+                const myId = String(currentUser.value.id);
+                const emps = employees.value || INITIAL_EMPLOYEES || [];
+                const myEmp = emps.find(e => e && String(e.id) === myId);
+                const myDept = myEmp?.dept || currentUser.value.dept;
+                return emps.filter(e => {
+                    if (!e) return false;
+                    if (String(e.id) === myId) return false;
+                    if (String(e.managerId) === myId) return true;
+                    if (isUserManager.value && e.dept === myDept && !isManager(e.id)) return true;
+                    return false;
+                });
+            } catch (e) {
+                return [];
+            }
         });
 
         const userReportingManager = computed(() => {
@@ -729,59 +724,76 @@ const app = createApp({
         });
 
         const managerSubordinateLeaves = computed(() => {
-            if (!currentUser.value || !isUserManager.value) return [];
-            const myId = String(currentUser.value.id);
-            const myEmp = (employees.value || INITIAL_EMPLOYEES || []).find(e => String(e.id) === myId);
-            const myDept = myEmp?.dept || currentUser.value.dept;
-            const subIds = new Set((userSubordinates.value || []).map(s => String(s.id)));
+            try {
+                if (!currentUser.value || !isUserManager.value) return [];
+                const myId = String(currentUser.value.id);
+                const myEmp = (employees.value || INITIAL_EMPLOYEES || []).find(e => String(e.id) === myId);
+                const myDept = myEmp?.dept || currentUser.value.dept;
+                const subIds = new Set((userSubordinates.value || []).map(s => String(s.id)));
 
-            const raw = (leaves.value || INITIAL_LEAVES || []).filter(l => {
-                // Never show manager's own leave requests in subordinate queue
-                if (String(l.empId) === myId) return false;
-                // Direct match by managerId
-                if (String(l.managerId) === myId) return true;
-                // Subordinate direct id match
-                if (subIds.has(String(l.empId))) return true;
-                // Manager name match
-                if (currentUser.value.name && l.managerName && l.managerName.toLowerCase() === currentUser.value.name.toLowerCase()) return true;
-                // Match by employee record in current employees list
-                const applicant = (employees.value || INITIAL_EMPLOYEES || []).find(e => String(e.id) === String(l.empId));
-                if (applicant) {
-                    if (String(applicant.managerId) === myId) return true;
-                    if (applicant.dept === myDept && !isManager(applicant.id) && (!l.managerId || String(l.managerId) === '1' || String(l.managerId) === myId)) {
-                        return true;
+                const raw = (leaves.value || INITIAL_LEAVES || []).filter(l => {
+                    if (!l) return false;
+                    // Never show manager's own leave requests in subordinate queue
+                    if (String(l.empId) === myId) return false;
+                    // Direct match by managerId
+                    if (String(l.managerId) === myId) return true;
+                    // Subordinate direct id match
+                    if (subIds.has(String(l.empId))) return true;
+                    // Manager name match
+                    if (currentUser.value.name && l.managerName && l.managerName.toLowerCase() === currentUser.value.name.toLowerCase()) return true;
+                    // Match by employee record in current employees list
+                    const applicant = (employees.value || INITIAL_EMPLOYEES || []).find(e => String(e.id) === String(l.empId));
+                    if (applicant) {
+                        if (String(applicant.managerId) === myId) return true;
+                        if (applicant.dept === myDept && !isManager(applicant.id) && (!l.managerId || String(l.managerId) === '1' || String(l.managerId) === myId)) {
+                            return true;
+                        }
+                    }
+                    return false;
+                });
+
+                // 1 leave per subordinate (Pending prioritized, then latest date)
+                raw.sort((a, b) => {
+                    if (a.status === 'Pending' && b.status !== 'Pending') return -1;
+                    if (b.status === 'Pending' && a.status !== 'Pending') return 1;
+                    const timeA = new Date(a.createdAt || a.from || 0).getTime();
+                    const timeB = new Date(b.createdAt || b.from || 0).getTime();
+                    return timeB - timeA;
+                });
+                const seen = new Set();
+                const result = [];
+                for (const l of raw) {
+                    const empKey = String(l.empId);
+                    if (!seen.has(empKey)) {
+                        seen.add(empKey);
+                        result.push(l);
                     }
                 }
-                return false;
-            });
-
-            // 1 leave per subordinate (Pending prioritized, then latest date)
-            raw.sort((a, b) => {
-                if (a.status === 'Pending' && b.status !== 'Pending') return -1;
-                if (b.status === 'Pending' && a.status !== 'Pending') return 1;
-                const timeA = new Date(a.createdAt || a.from || 0).getTime();
-                const timeB = new Date(b.createdAt || b.from || 0).getTime();
-                return timeB - timeA;
-            });
-            const seen = new Set();
-            const result = [];
-            for (const l of raw) {
-                const empKey = String(l.empId);
-                if (!seen.has(empKey)) {
-                    seen.add(empKey);
-                    result.push(l);
-                }
+                return result;
+            } catch (e) {
+                return [];
             }
-            return result;
         });
 
         const managerSubordinatePendingCount = computed(() => {
-            return managerSubordinateLeaves.value.filter(l => l.status === 'Pending').length;
+            try {
+                const list = managerSubordinateLeaves.value;
+                if (!Array.isArray(list)) return 0;
+                return list.filter(l => l && l.status === 'Pending').length;
+            } catch (e) {
+                return 0;
+            }
         });
 
         const userNotifications = computed(() => {
-            if (!currentUser.value) return [];
-            return notifications.value.filter(n => !n.targetEmpId || String(n.targetEmpId) === String(currentUser.value.id) || currentUser.value.role === 'admin');
+            try {
+                if (!currentUser.value) return [];
+                const list = notifications.value;
+                if (!Array.isArray(list)) return [];
+                return list.filter(n => n && (!n.targetEmpId || String(n.targetEmpId) === String(currentUser.value.id) || currentUser.value.role === 'admin'));
+            } catch (e) {
+                return [];
+            }
         });
 
         function addNotification(text, targetEmpId = null, icon = 'fa-bell') {
@@ -803,18 +815,20 @@ const app = createApp({
         function isManager(empId) {
             if (!empId) return false;
             if (String(empId) === '1') return true;
-            const emp = employees.value.find(e => String(e.id) === String(empId));
+            const emps = employees.value || INITIAL_EMPLOYEES || [];
+            const emp = emps.find(e => e && String(e.id) === String(empId));
             if (emp) {
                 const r = (emp.role || emp.designation || '').toLowerCase();
                 if (r.includes('manager') || r.includes('lead') || r.includes('supervisor') || r.includes('head')) return true;
             }
-            return employees.value.some(e => String(e.managerId) === String(empId));
+            return emps.some(e => e && String(e.managerId) === String(empId));
         }
 
         function getEmployeeManager(empId) {
-            const emp = employees.value.find(e => String(e.id) === String(empId));
+            const emps = employees.value || INITIAL_EMPLOYEES || [];
+            const emp = emps.find(e => e && String(e.id) === String(empId));
             if (!emp || !emp.managerId || String(emp.managerId) === '1' || String(emp.managerId) === String(empId)) return null;
-            return employees.value.find(e => String(e.id) === String(emp.managerId)) || null;
+            return emps.find(e => e && String(e.id) === String(emp.managerId)) || null;
         }
 
         function getEmployeeManagerName(managerId) {
@@ -977,12 +991,12 @@ const app = createApp({
 
         const viewedEmployeeTimesheets = computed(() => {
             if (!viewedEmployeeId.value) return [];
-            return timesheets.value.filter(t => String(t.empId) === String(viewedEmployeeId.value));
+            return (timesheets.value || INITIAL_TIMESHEETS || []).filter(t => String(t.empId) === String(viewedEmployeeId.value));
         });
 
         const viewedEmployeeLeaves = computed(() => {
             if (!viewedEmployeeId.value) return [];
-            return leaves.value.filter(l => String(l.empId) === String(viewedEmployeeId.value));
+            return (leaves.value || INITIAL_LEAVES || []).filter(l => String(l.empId) === String(viewedEmployeeId.value));
         });
 
         function openAvatarPicker() { modals.avatar = true; }
@@ -1037,7 +1051,7 @@ const app = createApp({
         // ── Change Password & Announcements State & Methods ─────────────────
         const passwordForm = reactive({ oldPassword: '', newPassword: '', confirmPassword: '' });
         const announcementForm = reactive({ title: '', message: '', priority: 'Normal' });
-        const announcementsList = ref(JSON.parse(localStorage.getItem('ark_announcements')) || [
+        const announcementsList = ref(safeParseJSON('ark_announcements', null) || [
             { id: 'AN-1', title: 'Welcome to ARK HRMS Enterprise', message: 'All employees are requested to maintain punctuality and record shift hours in NJ Time.', date: '2026-09-01', priority: 'High', author: 'Administrator' }
         ]);
         watch(announcementsList, () => localStorage.setItem('ark_announcements', JSON.stringify(announcementsList.value)), { deep: true });
@@ -2341,9 +2355,9 @@ const app = createApp({
         const rosterEmpOptions = computed(() => {
             const opts = [{ value: 'my', label: 'My Attendance' }];
             if (currentRole.value === 'admin') {
-                employees.value.forEach(e => opts.push({ value: String(e.id), label: e.name }));
+                (employees.value || INITIAL_EMPLOYEES || []).forEach(e => opts.push({ value: String(e.id), label: e.name }));
             } else if (isUserManager.value) {
-                userSubordinates.value.forEach(e => opts.push({ value: String(e.id), label: e.name + ' (Sub)' }));
+                (userSubordinates.value || []).forEach(e => opts.push({ value: String(e.id), label: e.name + ' (Sub)' }));
             }
             return opts;
         });
@@ -2354,8 +2368,8 @@ const app = createApp({
                 ? (currentUser.value ? String(currentUser.value.id) : null)
                 : selectedRosterEmpId.value;
             if (!empId) return [];
-            const [yr, mo] = selectedRosterMonth.value.split('-').map(Number);
-            return leaves.value.filter(l => {
+            const [yr, mo] = selectedRosterMonth.value.split('-'.trim()).map(Number);
+            return (leaves.value || INITIAL_LEAVES || []).filter(l => {
                 if (String(l.empId) !== empId) return false;
                 if (!l.from) return false;
                 const d = new Date(l.from);
@@ -2421,21 +2435,26 @@ const app = createApp({
         const currentEvalMonth = computed(() => getNJDateString().slice(0, 7)); // 'YYYY-MM' e.g. '2026-09'
 
         const pendingRatings = computed(() => {
-            if (!currentUser.value) return [];
-            const monthKey = currentEvalMonth.value;
-            let targetList = [];
+            try {
+                if (!currentUser.value) return [];
+                const monthKey = currentEvalMonth.value;
+                let targetList = [];
 
-            if (currentRole.value === 'admin') {
-                targetList = employees.value.filter(e => String(e.id) !== '1');
-            } else if (isUserManager.value) {
-                targetList = userSubordinates.value;
-            } else {
+                if (currentRole.value === 'admin') {
+                    targetList = (employees.value || INITIAL_EMPLOYEES || []).filter(e => e && String(e.id) !== '1');
+                } else if (isUserManager.value) {
+                    targetList = userSubordinates.value || [];
+                } else {
+                    return [];
+                }
+
+                const ratings = performanceRatings.value || [];
+                return targetList.filter(e => {
+                    return e && !ratings.some(r => r && String(r.empId) === String(e.id) && r.month === monthKey && String(r.raterId) === String(currentUser.value.id));
+                });
+            } catch (e) {
                 return [];
             }
-
-            return targetList.filter(e => {
-                return !performanceRatings.value.some(r => String(r.empId) === String(e.id) && r.month === monthKey && String(r.raterId) === String(currentUser.value.id));
-            });
         });
 
         const evalRatingForm = reactive({});
@@ -2613,6 +2632,7 @@ const app = createApp({
             performanceRatings, pendingRatings, currentEvalMonth, evalRatingForm, openEvalModal, submitEmployeeRating,
             openChangePasswordModal, submitChangePassword, openAnnouncementsModal, postAnnouncement, deleteAnnouncement,
             clearNotifications,
+            announcementsList, announcementForm, passwordForm, showToast,
             getBadgeClasses, formatDateNice, getLeaveAuditBadge, isManager, getEmployeeManager, getEmployeeManagerName,
             canAdminDecideLeave, formatSecondsHms, formatSecondsPretty, pad2
         };
@@ -2620,4 +2640,3 @@ const app = createApp({
 });
 
 app.mount('#app');
-

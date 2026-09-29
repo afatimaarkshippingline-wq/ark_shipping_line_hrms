@@ -17,8 +17,16 @@ const SupabaseService = (() => {
     let _client = null;
 
     function _getClient() {
-        const url = localStorage.getItem('ark_supabase_url') || CONFIG.DEFAULT_SUPABASE_URL;
-        const key = localStorage.getItem('ark_supabase_key') || CONFIG.DEFAULT_SUPABASE_ANON_KEY;
+        let url = localStorage.getItem('ark_supabase_url');
+        let key = localStorage.getItem('ark_supabase_key');
+        if (!url || url.includes('eoxe7cw0t9lf8wtyfodyw') || !url.includes('supabase.co')) {
+            url = CONFIG.DEFAULT_SUPABASE_URL;
+            key = CONFIG.DEFAULT_SUPABASE_ANON_KEY;
+            if (url) {
+                localStorage.setItem('ark_supabase_url', url);
+                localStorage.setItem('ark_supabase_key', key);
+            }
+        }
         if (!url || !key) return null;
         if (_client) return _client;
         try {

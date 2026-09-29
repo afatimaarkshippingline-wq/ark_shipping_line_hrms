@@ -5,8 +5,8 @@
 
 const CONFIG = {
     // Supabase configuration — paste your own credentials in Admin → Settings
-    DEFAULT_SUPABASE_URL: '',          // e.g. https://xyzcompany.supabase.co
-    DEFAULT_SUPABASE_ANON_KEY: '',     // e.g. eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+    DEFAULT_SUPABASE_URL: 'https://ezdsvzunxolseezqvikn.supabase.co',          // e.g. https://xyzcompany.supabase.co
+    DEFAULT_SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV6ZHN2enVueG9sc2VlenF2aWtuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA1Nzg5OTAsImV4cCI6MjEwNjE1NDk5MH0.OFe5jWJj69xwwXe2tQtnJsDCy9AfoDRAINEdVEN5R24',     // e.g. eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 
     // Legacy Google Apps Script URL (kept for reference, no longer used)
     DEFAULT_API_URL: '',
@@ -129,7 +129,7 @@ const INITIAL_TIMESHEETS = [
     { id: 'TS-SEED-09', empId: '102', empName: 'Samra Farid', dept: 'Accounts', action: 'Check Out', date: '2026-09-22', time: '06:10:00 PM', checkIn: '08:02:00 AM', checkOut: '06:10:00 PM', totalHours: '09h 48m 00s', breakTime: '00h 20m 00s', workingSeconds: 35280, breakSeconds: 1200, punctuality: 'On Time', notes: 'Completed shift' },
     { id: 'TS-SEED-10', empId: '101', empName: 'Dara Janwary', dept: 'Accounts', action: 'Check Out', date: '2026-09-21', time: '06:05:00 PM', checkIn: '08:01:00 AM', checkOut: '06:05:00 PM', totalHours: '09h 44m 00s', breakTime: '00h 20m 00s', workingSeconds: 35040, breakSeconds: 1200, punctuality: 'On Time', notes: 'Completed shift' },
     { id: 'TS-SEED-11', empId: '102', empName: 'Samra Farid', dept: 'Accounts', action: 'Check Out', date: '2026-09-21', time: '06:00:00 PM', checkIn: '08:35:00 AM', checkOut: '06:00:00 PM', totalHours: '09h 00m 00s', breakTime: '00h 25m 00s', workingSeconds: 32400, breakSeconds: 1500, punctuality: 'Late Arrival', notes: 'Late arrival' },
-    { id: 'TS-SEED-12', empId: '101', empName: 'Dara Janwary', dept: 'Accounts', action: 'Check Out', date: '2026-09-18', time: '06:00:00 PM', chckIn: '08:00:00 AM', checkOut: '06:00:00 PM', totalHours: '09h 40m 00s', breakTime: '00h 20m 00s', workingSeconds: 34800, breakSeconds: 1200, punctuality: 'On Time', notes: 'Completed shift' },
+    { id: 'TS-SEED-12', empId: '101', empName: 'Dara Janwary', dept: 'Accounts', action: 'Check Out', date: '2026-09-18', time: '06:00:00 PM', checkIn: '08:00:00 AM', checkOut: '06:00:00 PM', totalHours: '09h 40m 00s', breakTime: '00h 20m 00s', workingSeconds: 34800, breakSeconds: 1200, punctuality: 'On Time', notes: 'Completed shift' },
     { id: 'TS-SEED-13', empId: '102', empName: 'Samra Farid', dept: 'Accounts', action: 'Check Out', date: '2026-09-18', time: '06:05:00 PM', checkIn: '08:00:00 AM', checkOut: '06:05:00 PM', totalHours: '09h 45m 00s', breakTime: '00h 20m 00s', workingSeconds: 35100, breakSeconds: 1200, punctuality: 'On Time', notes: 'Completed shift' },
     { id: 'TS-SEED-14', empId: '101', empName: 'Dara Janwary', dept: 'Accounts', action: 'Check Out', date: '2026-09-17', time: '06:10:00 PM', checkIn: '08:00:00 AM', checkOut: '06:10:00 PM', totalHours: '09h 50m 00s', breakTime: '00h 20m 00s', workingSeconds: 35400, breakSeconds: 1200, punctuality: 'On Time', notes: 'Completed shift' },
     { id: 'TS-SEED-15', empId: '102', empName: 'Samra Farid', dept: 'Accounts', action: 'Check Out', date: '2026-09-17', time: '06:00:00 PM', checkIn: '08:00:00 AM', checkOut: '06:00:00 PM', totalHours: '09h 35m 00s', breakTime: '00h 25m 00s', workingSeconds: 34500, breakSeconds: 1500, punctuality: 'On Time', notes: 'Completed shift' }
