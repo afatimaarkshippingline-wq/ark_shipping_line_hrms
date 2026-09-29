@@ -1577,21 +1577,49 @@ const app = createApp({
                     drawCard(416, 112, 178, 46, 'Late Arrivals Recorded', lateCount, [225, 29, 72]);
                     drawCard(608, 112, 202, 46, 'Scope / Target', reportScope.value === 'individual' ? (employees.value.find(e=>String(e.id)===String(reportSelectedEmpId.value))?.name || 'Selected') : 'Organization-Wide', [124, 58, 237]);
 
-                    // Attendance Rows
-                    const rows = targetList.map(t => [
-                        t.date || '—',
-                        t.empId || '—',
-                        t.empName || '—',
-                        t.dept || (employees.value.find(e => String(e.id) === String(t.empId))?.dept) || 'Operations',
-                        t.action || 'Shift Event',
-                        t.time || '—',
-                        t.totalHours || '09h 45m',
-                        t.punctuality || 'On Time'
+                    // Group/Merge attendance events into 1 row per employee shift/day (Check-In & Check-Out side by side)
+                    const shiftMap = {};
+                    targetList.forEach(t => {
+                        const key = `${t.empId}_${t.date}`;
+                        if (!shiftMap[key]) {
+                            shiftMap[key] = {
+                                date: t.date || '—',
+                                empId: t.empId || '—',
+                                empName: t.empName || '—',
+                                dept: t.dept || (employees.value.find(e => String(e.id) === String(t.empId))?.dept) || 'Operations',
+                                checkIn: '—',
+                                checkOut: '—',
+                                totalHours: t.totalHours || '—',
+                                punctuality: t.punctuality || 'On Time'
+                            };
+                        }
+                        const act = String(t.action || '').toLowerCase();
+                        if (act.includes('in')) {
+                            shiftMap[key].checkIn = t.time || '—';
+                        } else if (act.includes('out')) {
+                            shiftMap[key].checkOut = t.time || '—';
+                            if (t.totalHours) shiftMap[key].totalHours = t.totalHours;
+                            if (t.punctuality) shiftMap[key].punctuality = t.punctuality;
+                        } else {
+                            if (shiftMap[key].checkIn === '—') shiftMap[key].checkIn = t.time || '—';
+                            else shiftMap[key].checkOut = t.time || '—';
+                        }
+                    });
+
+                    const rows = Object.values(shiftMap).map(s => [
+                        s.date,
+                        s.empId,
+                        s.empName,
+                        s.dept,
+                        s.checkIn,
+                        s.checkOut,
+                        s.totalHours,
+                        s.punctuality
                     ]);
 
                     doc.autoTable({
                         startY: 170,
-                        head: [['Date', 'Emp ID', 'Employee Name', 'Department', 'Logged Action', 'Time', 'Shift Hours', 'Punctuality']],
+                        head: [['Date', 'Emp ID', 'Employee Name', 'Department', 'Check-In Time', 'Check-Out Time', 'Shift Hours', 'Punctuality']],
                         body: rows.length ? rows : [['—', '—', 'No attendance records found for criteria', '—', '—', '—', '—', '—']],
                         theme: 'striped',
                         headStyles: { fillColor: [12, 26, 75], textColor: 255, fontStyle: 'bold', fontSize: 8.5 },
