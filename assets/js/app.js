@@ -62,6 +62,9 @@ const app = createApp({
         localStorage.removeItem('ark_timesheets');
         localStorage.removeItem('ark_leaves');
         localStorage.removeItem('ark_emp_weekly_checkins');
+        localStorage.removeItem('ark_performance_ratings');
+        localStorage.removeItem('ark_audit_logs');
+        localStorage.removeItem('ark_notifications');
 
         // Core Collections with Local Storage Cache (Fresh start default for client delivery)
         const employees = ref(safeParseJSON('ark_employees', null) || (typeof INITIAL_EMPLOYEES !== 'undefined' ? INITIAL_EMPLOYEES.map(e => ({ ...e, leaveQuotas: { annual: 14, sick: 7, casual: 5 } })) : []));
@@ -2426,7 +2429,7 @@ const app = createApp({
         }
 
         // ── Monthly PER (Performance Evaluation & Rating) System ───────────
-        const performanceRatings = ref(JSON.parse(localStorage.getItem('ark_performance_ratings')) || []);
+        const performanceRatings = ref([]);
         watch(performanceRatings, () => localStorage.setItem('ark_performance_ratings', JSON.stringify(performanceRatings.value)), { deep: true });
 
         const currentEvalMonth = computed(() => getNJDateString().slice(0, 7)); // 'YYYY-MM' e.g. '2026-09'
@@ -2499,15 +2502,19 @@ const app = createApp({
 
         // Dynamic Top Performers derived from PER ratings & punctuality
         const topPerformers = computed(() => {
-            return employees.value
-                .filter(e => e.status !== 'Inactive')
+            const ratings = performanceRatings.value || [];
+            const ts = timesheets.value || [];
+            if (ratings.length === 0 && ts.length === 0) return [];
+
+            return (employees.value || INITIAL_EMPLOYEES || [])
+                .filter(e => e && e.status !== 'Inactive')
                 .map(e => {
-                    const empRatings = performanceRatings.value.filter(r => String(r.empId) === String(e.id));
+                    const empRatings = ratings.filter(r => r && String(r.empId) === String(e.id));
                     let avgRating = 4.5;
                     if (empRatings.length > 0) {
                         avgRating = empRatings.reduce((s, r) => s + Number(r.rating || 5), 0) / empRatings.length;
                     }
-                    const empTs = timesheets.value.filter(t => String(t.empId) === String(e.id));
+                    const empTs = ts.filter(t => t && String(t.empId) === String(e.id));
                     let punctualityPct = 100;
                     if (empTs.length > 0) {
                         const onTime = empTs.filter(t => t.punctuality !== 'Late Arrival').length;
