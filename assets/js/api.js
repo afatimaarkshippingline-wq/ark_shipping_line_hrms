@@ -22,6 +22,7 @@ const SupabaseService = (() => {
         if (!url || !key) return null;
         if (_client) return _client;
         try {
+            if (typeof supabase === 'undefined' || !supabase.createClient) return null;
             // supabase-js v2 is loaded via CDN as window.supabase
             _client = supabase.createClient(url, key);
             return _client;

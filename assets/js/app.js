@@ -48,20 +48,30 @@ const app = createApp({
             return result;
         }
 
+        function safeParseJSON(key, fallback) {
+            try {
+                const item = localStorage.getItem(key);
+                return item ? JSON.parse(item) : fallback;
+            } catch (e) {
+                console.warn(`[SafeParse] Failed to parse key "${key}":`, e);
+                return fallback;
+            }
+        }
+
         // Core Collections with Local Storage Cache (Fresh start default for client delivery)
-        const employees = ref(JSON.parse(localStorage.getItem('ark_employees')) || INITIAL_EMPLOYEES.map(e => ({ ...e, leaveQuotas: { annual: 14, sick: 7, casual: 5 } })));
-        const leaves = ref(sanitizeLeavesList(JSON.parse(localStorage.getItem('ark_leaves')) || []));
-        const timesheets = ref(JSON.parse(localStorage.getItem('ark_timesheets')) || []);
-        const departments = ref(JSON.parse(localStorage.getItem('ark_departments') || '[]'));
-        const notifications = ref(JSON.parse(localStorage.getItem('ark_notifications') || '[]'));
+        const employees = ref(safeParseJSON('ark_employees', null) || INITIAL_EMPLOYEES.map(e => ({ ...e, leaveQuotas: { annual: 14, sick: 7, casual: 5 } })));
+        const leaves = ref(sanitizeLeavesList(safeParseJSON('ark_leaves', [])));
+        const timesheets = ref(safeParseJSON('ark_timesheets', []));
+        const departments = ref(safeParseJSON('ark_departments', []));
+        const notifications = ref(safeParseJSON('ark_notifications', []));
 
         // Employee Shift Session & Punch Log
         const employeeAttendanceState = ref('out');
-        const shiftSession = reactive(JSON.parse(localStorage.getItem('ark_emp_shift') || 'null') || {
+        const shiftSession = reactive(safeParseJSON('ark_emp_shift', null) || {
             checkInTime: '', checkOutTime: '', breakMinutes: 0, workingMinutes: 0, workingSeconds: 0, breakSeconds: 0, isCompleted: false, punctuality: 'On Time'
         });
-        const punchLog = reactive(JSON.parse(localStorage.getItem('ark_emp_punch_log') || 'null') || {});
-        const mockWeeklyCheckIns = ref(JSON.parse(localStorage.getItem('ark_emp_weekly_checkins') || '[]'));
+        const punchLog = reactive(safeParseJSON('ark_emp_punch_log', null) || {});
+        const mockWeeklyCheckIns = ref(safeParseJSON('ark_emp_weekly_checkins', []));
 
         // Live shift ticker & submission lock
         const isSubmittingLeave = ref(false);
