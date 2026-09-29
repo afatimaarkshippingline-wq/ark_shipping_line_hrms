@@ -59,10 +59,10 @@ const app = createApp({
         }
 
         // Core Collections with Local Storage Cache (Fresh start default for client delivery)
-        const employees = ref(safeParseJSON('ark_employees', null) || INITIAL_EMPLOYEES.map(e => ({ ...e, leaveQuotas: { annual: 14, sick: 7, casual: 5 } })));
-        const leaves = ref(sanitizeLeavesList(safeParseJSON('ark_leaves', [])));
-        const timesheets = ref(safeParseJSON('ark_timesheets', []));
-        const departments = ref(safeParseJSON('ark_departments', []));
+        const employees = ref(safeParseJSON('ark_employees', null) || (typeof INITIAL_EMPLOYEES !== 'undefined' ? INITIAL_EMPLOYEES.map(e => ({ ...e, leaveQuotas: { annual: 14, sick: 7, casual: 5 } })) : []));
+        const leaves = ref(sanitizeLeavesList(safeParseJSON('ark_leaves', null) || (typeof INITIAL_LEAVES !== 'undefined' ? INITIAL_LEAVES : [])));
+        const timesheets = ref(safeParseJSON('ark_timesheets', null) || (typeof INITIAL_TIMESHEETS !== 'undefined' ? INITIAL_TIMESHEETS : []));
+        const departments = ref(safeParseJSON('ark_departments', null) || ['Accounts', 'Documentation', 'Dispatch', 'Operations', 'HR']);
         const notifications = ref(safeParseJSON('ark_notifications', []));
 
         // Employee Shift Session & Punch Log
@@ -582,7 +582,7 @@ const app = createApp({
             const q = (empFilter.search || '').toLowerCase();
             const d = empFilter.dept;
             const s = empFilter.status;
-            return employees.value.filter(e => {
+            return (employees.value || INITIAL_EMPLOYEES || []).filter(e => {
                 const mq = e.name.toLowerCase().includes(q) || String(e.id).toLowerCase().includes(q) || e.email.toLowerCase().includes(q);
                 return mq && (d === 'All' || e.dept === d) && (s === 'All' || e.status === s);
             });
@@ -605,7 +605,7 @@ const app = createApp({
         }
 
         const adminPendingLeavesCount = computed(() => {
-            const list = leaves.value.filter(l => canAdminDecideLeave(l));
+            const list = (leaves.value || INITIAL_LEAVES || []).filter(l => canAdminDecideLeave(l));
             const seen = new Set();
             for (const l of list) {
                 seen.add(String(l.empId));
@@ -615,7 +615,7 @@ const app = createApp({
 
         // Overview widget: exactly 1 pending leave per employee
         const pendingLeavesOverview = computed(() => {
-            const list = leaves.value.filter(l => l.status === 'Pending' || l.status === 'ManagerApproved');
+            const list = (leaves.value || INITIAL_LEAVES || []).filter(l => l.status === 'Pending' || l.status === 'ManagerApproved');
             // Prioritize leaves ready for admin decision, then most recent date
             list.sort((a, b) => {
                 const aAdmin = canAdminDecideLeave(a) ? 1 : 0;
@@ -639,7 +639,7 @@ const app = createApp({
 
         // Leaves & Approvals Queue Table: exactly 1 leave per employee
         const filteredAdminLeaves = computed(() => {
-            let pool = leaves.value;
+            let pool = (leaves.value || INITIAL_LEAVES || []);
             if (leaveFilterStatus.value !== 'All') {
                 pool = pool.filter(l => l.status === leaveFilterStatus.value);
             }
@@ -674,31 +674,31 @@ const app = createApp({
         // Unique employee counts for Leaves tab stats
         const adminStatsAwaitingAdmin = computed(() => {
             const seen = new Set();
-            leaves.value.filter(l => canAdminDecideLeave(l)).forEach(l => seen.add(String(l.empId)));
+            (leaves.value || INITIAL_LEAVES || []).filter(l => canAdminDecideLeave(l)).forEach(l => seen.add(String(l.empId)));
             return seen.size;
         });
 
         const adminStatsAwaitingMgr = computed(() => {
             const seen = new Set();
-            leaves.value.filter(l => l.status === 'Pending' && !canAdminDecideLeave(l)).forEach(l => seen.add(String(l.empId)));
+            (leaves.value || INITIAL_LEAVES || []).filter(l => l.status === 'Pending' && !canAdminDecideLeave(l)).forEach(l => seen.add(String(l.empId)));
             return seen.size;
         });
 
         const adminStatsApproved = computed(() => {
             const seen = new Set();
-            leaves.value.filter(l => l.status === 'Approved').forEach(l => seen.add(String(l.empId)));
+            (leaves.value || INITIAL_LEAVES || []).filter(l => l.status === 'Approved').forEach(l => seen.add(String(l.empId)));
             return seen.size;
         });
 
         const adminStatsRejected = computed(() => {
             const seen = new Set();
-            leaves.value.filter(l => l.status === 'Rejected').forEach(l => seen.add(String(l.empId)));
+            (leaves.value || INITIAL_LEAVES || []).filter(l => l.status === 'Rejected').forEach(l => seen.add(String(l.empId)));
             return seen.size;
         });
 
         const mySubmittedLeaves = computed(() => {
             if (!currentUser.value) return [];
-            return leaves.value.filter(l => String(l.empId) === String(currentUser.value.id));
+            return (leaves.value || INITIAL_LEAVES || []).filter(l => String(l.empId) === String(currentUser.value.id));
         });
 
         const isUserManager = computed(() => {
@@ -711,9 +711,9 @@ const app = createApp({
         const userSubordinates = computed(() => {
             if (!currentUser.value) return [];
             const myId = String(currentUser.value.id);
-            const myEmp = employees.value.find(e => String(e.id) === myId);
+            const myEmp = (employees.value || INITIAL_EMPLOYEES || []).find(e => String(e.id) === myId);
             const myDept = myEmp?.dept || currentUser.value.dept;
-            return employees.value.filter(e => {
+            return (employees.value || INITIAL_EMPLOYEES || []).filter(e => {
                 if (String(e.id) === myId) return false;
                 if (String(e.managerId) === myId) return true;
                 if (isUserManager.value && e.dept === myDept && !isManager(e.id)) return true;
@@ -723,7 +723,7 @@ const app = createApp({
 
         const userReportingManager = computed(() => {
             if (!currentUser.value) return { name: 'Super Administrator', role: 'Executive', dept: 'Executive', avatar: '👨‍💼', email: 'admin@ark.com' };
-            const m = currentUser.value.managerId ? employees.value.find(e => String(e.id) === String(currentUser.value.managerId)) : null;
+            const m = currentUser.value.managerId ? (employees.value || INITIAL_EMPLOYEES || []).find(e => String(e.id) === String(currentUser.value.managerId)) : null;
             if (m) return { name: m.name, role: m.role || 'Manager', dept: m.dept || 'Executive', avatar: m.avatar || '👨‍💼', email: m.email };
             return { name: 'Super Administrator', role: 'Super Administrator', dept: 'Executive / HR', avatar: '👨‍💼', email: 'admin@ark.com' };
         });
@@ -731,11 +731,11 @@ const app = createApp({
         const managerSubordinateLeaves = computed(() => {
             if (!currentUser.value || !isUserManager.value) return [];
             const myId = String(currentUser.value.id);
-            const myEmp = employees.value.find(e => String(e.id) === myId);
+            const myEmp = (employees.value || INITIAL_EMPLOYEES || []).find(e => String(e.id) === myId);
             const myDept = myEmp?.dept || currentUser.value.dept;
-            const subIds = new Set(userSubordinates.value.map(s => String(s.id)));
+            const subIds = new Set((userSubordinates.value || []).map(s => String(s.id)));
 
-            const raw = leaves.value.filter(l => {
+            const raw = (leaves.value || INITIAL_LEAVES || []).filter(l => {
                 // Never show manager's own leave requests in subordinate queue
                 if (String(l.empId) === myId) return false;
                 // Direct match by managerId
@@ -745,7 +745,7 @@ const app = createApp({
                 // Manager name match
                 if (currentUser.value.name && l.managerName && l.managerName.toLowerCase() === currentUser.value.name.toLowerCase()) return true;
                 // Match by employee record in current employees list
-                const applicant = employees.value.find(e => String(e.id) === String(l.empId));
+                const applicant = (employees.value || INITIAL_EMPLOYEES || []).find(e => String(e.id) === String(l.empId));
                 if (applicant) {
                     if (String(applicant.managerId) === myId) return true;
                     if (applicant.dept === myDept && !isManager(applicant.id) && (!l.managerId || String(l.managerId) === '1' || String(l.managerId) === myId)) {
