@@ -1739,7 +1739,7 @@ const app = createApp({
                         l.empId || '—',
                         l.empName || '—',
                         l.type || 'Annual',
-                        `${formatDateNice(l.from)} → ${formatDateNice(l.to)}`,
+                        `${formatDateNice(l.from)} to ${formatDateNice(l.to)}`,
                         `${l.days} d`,
                         (l.reason || '—').slice(0, 35),
                         l.managerDecision ? `${l.managerDecision} (${l.managerName || 'Mgr'})` : 'Awaiting Review',
@@ -1789,20 +1789,59 @@ const app = createApp({
             }, 300);
         }
 
+        // ── Employee Self-Service Report State & Export ─────────────────────
+        const myReportDateMode = ref('month');
+        const myReportStartDate = ref(new Date().toISOString().slice(0, 10));
+        const myReportEndDate = ref(new Date().toISOString().slice(0, 10));
+        const myReportMonth = ref((() => { const d = new Date(); return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`; })());
+        const myReportType = ref('attendance'); // 'attendance' or 'leaves'
+
+        function exportMyReportPDF() {
+            if (!currentUser.value) return;
+            reportDateMode.value = myReportDateMode.value;
+            reportStartDate.value = myReportStartDate.value;
+            reportEndDate.value = myReportEndDate.value;
+            reportMonth.value = myReportMonth.value;
+            reportScope.value = 'individual';
+            reportSelectedEmpId.value = currentUser.value.id;
+
+            if (myReportType.value === 'leaves') {
+                exportLeavesPDF();
+            } else {
+                exportAttendancePDF();
+            }
+        }
+
+        // ── Manager Team Report State & Export ──────────────────────────────
+        const mgrReportDateMode = ref('month');
+        const mgrReportStartDate = ref(new Date().toISOString().slice(0, 10));
+        const mgrReportEndDate = ref(new Date().toISOString().slice(0, 10));
+        const mgrReportMonth = ref((() => { const d = new Date(); return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`; })());
+        const mgrReportSubId = ref('all'); // 'all' or specific empId
+        const mgrReportType = ref('attendance'); // 'attendance' or 'leaves'
+
         function exportManagerTeamPDF() {
             if (!isUserManager.value) {
                 showToast('Manager access required', 'error');
                 return;
             }
-            reportScope.value = 'subordinates';
-            exportAttendancePDF();
-        }
+            reportDateMode.value = mgrReportDateMode.value;
+            reportStartDate.value = mgrReportStartDate.value;
+            reportEndDate.value = mgrReportEndDate.value;
+            reportMonth.value = mgrReportMonth.value;
 
-        function exportMyReportPDF() {
-            if (!currentUser.value) return;
-            reportScope.value = 'individual';
-            reportSelectedEmpId.value = currentUser.value.id;
-            exportAttendancePDF();
+            if (mgrReportSubId.value === 'all') {
+                reportScope.value = 'subordinates';
+            } else {
+                reportScope.value = 'individual';
+                reportSelectedEmpId.value = mgrReportSubId.value;
+            }
+
+            if (mgrReportType.value === 'leaves') {
+                exportLeavesPDF();
+            } else {
+                exportAttendancePDF();
+            }
         }
 
         function exportRosterPDF() {
@@ -1994,7 +2033,7 @@ const app = createApp({
                     const lvRows = empLeaves.map(l => [
                         l.id || '—',
                         l.type || 'Annual',
-                        `${formatDateNice(l.from)} → ${formatDateNice(l.to)}`,
+                        `${formatDateNice(l.from)} to ${formatDateNice(l.to)}`,
                         `${l.days}d`,
                         (l.reason || '—').slice(0, 30),
                         l.managerDecision ? `${l.managerDecision} (${l.managerName || 'Mgr'})` : '—',
@@ -2264,6 +2303,8 @@ const app = createApp({
             isSubmittingLeave, liveNow, selectedRosterMonth, selectedRosterEmpId, rosterViewMode, availableMonths,
             monthlyRosterData, rosterEmpOptions, rosterSelectedEmpLeaves, reportMonth, reportDossierEmpId,
             reportDateMode, reportStartDate, reportEndDate, reportScope, reportSelectedEmpId,
+            myReportDateMode, myReportStartDate, myReportEndDate, myReportMonth, myReportType,
+            mgrReportDateMode, mgrReportStartDate, mgrReportEndDate, mgrReportMonth, mgrReportSubId, mgrReportType,
             dailyQuote, fetchDailyQuote,
             toggleDarkMode, handleLogin, logout, switchAdminNav, switchEmpTab,
             syncFromSupabase, saveSupabaseCredentials, testSupabaseConnection, downloadJsonBackup, resetWorkspaceData,
