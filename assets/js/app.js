@@ -309,6 +309,23 @@ const app = createApp({
             return `${m}m ${pad2(s % 60)}s`;
         }
 
+        function parseTotalHoursToSeconds(str) {
+            if (!str) return 0;
+            const s = String(str).trim();
+            const hMatch = s.match(/(\d+)h/);
+            const mMatch = s.match(/(\d+)m/);
+            const sMatch = s.match(/(\d+)s/);
+            if (hMatch || mMatch || sMatch) {
+                let sec = 0;
+                if (hMatch) sec += parseInt(hMatch[1], 10) * 3600;
+                if (mMatch) sec += parseInt(mMatch[1], 10) * 60;
+                if (sMatch) sec += parseInt(sMatch[1], 10);
+                return sec;
+            }
+            const num = parseFloat(s);
+            return isNaN(num) ? 0 : Math.round(num * 3600);
+        }
+
         function updateClocks() {
             const now = new Date();
             liveNow.value = Date.now();
@@ -2297,11 +2314,15 @@ const app = createApp({
             let completedWorkSec = 0;
 
             // Build per-day data
-            const dayMap = {}; // date string -> checkout timesheet
+            const dayMap = {}; // date string -> timesheet
             if (empId) {
                 timesheets.value
-                    .filter(t => String(t.empId) === String(empId) && t.action === 'Check Out' && t.date && t.date.startsWith(`${yr}-${pad2(mo)}`))
-                    .forEach(t => { dayMap[t.date] = t; });
+                    .filter(t => String(t.empId) === String(empId) && t.date && t.date.startsWith(`${yr}-${pad2(mo)}`) && (t.totalHours || t.action === 'Check Out' || String(t.action).toLowerCase().includes('out')))
+                    .forEach(t => {
+                        if (!dayMap[t.date] || (parseTotalHoursToSeconds(t.totalHours) > parseTotalHoursToSeconds(dayMap[t.date].totalHours))) {
+                            dayMap[t.date] = t;
+                        }
+                    });
             }
 
             for (let d = 1; d <= totalDays; d++) {
@@ -2318,14 +2339,7 @@ const app = createApp({
                     workDays++;
                     const ts = dayMap[dateStr];
                     if (ts) {
-                        // Parse seconds from totalHours string (e.g. "8h 30m 10s" or "8h 30m")
-                        let sec = 0;
-                        const hMatch = (ts.totalHours || '').match(/(\d+)h/);
-                        const mMatch = (ts.totalHours || '').match(/(\d+)m/);
-                        const sMatch = (ts.totalHours || '').match(/(\d+)s/);
-                        if (hMatch) sec += parseInt(hMatch[1]) * 3600;
-                        if (mMatch) sec += parseInt(mMatch[1]) * 60;
-                        if (sMatch) sec += parseInt(sMatch[1]);
+                        const sec = parseTotalHoursToSeconds(ts.totalHours);
                         completedWorkSec += sec;
                         rows.push({ day: d, dateStr, dayLabel, isRest: false, status: 'Done', checkIn: ts.time || '—', checkOut: ts.time || '—', netWork: ts.totalHours || '—', breakTime: ts.breakDeducted || '—', complete: true });
                     } else {

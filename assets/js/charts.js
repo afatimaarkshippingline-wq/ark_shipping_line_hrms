@@ -220,8 +220,22 @@ const ChartManager = {
         if (!canvas || typeof Chart === 'undefined') return;
         this.destroy('attHours');
         const theme = this.getTheme(isDark);
-        const labels = timesheets.slice(0, 10).map(t => t.empName.split(' ')[0]);
-        const data = timesheets.slice(0, 10).map(t => parseFloat(String(t.totalHours).replace('h', '')) || 0);
+        const labels = timesheets.slice(0, 10).map(t => t.empName ? t.empName.split(' ')[0] : 'Emp');
+        const data = timesheets.slice(0, 10).map(t => {
+            const s = String(t.totalHours || '').trim();
+            const hMatch = s.match(/(\d+)h/);
+            const mMatch = s.match(/(\d+)m/);
+            const sMatch = s.match(/(\d+)s/);
+            if (hMatch || mMatch || sMatch) {
+                let sec = 0;
+                if (hMatch) sec += parseInt(hMatch[1], 10) * 3600;
+                if (mMatch) sec += parseInt(mMatch[1], 10) * 60;
+                if (sMatch) sec += parseInt(sMatch[1], 10);
+                return Math.round((sec / 3600) * 100) / 100;
+            }
+            const num = parseFloat(s);
+            return isNaN(num) ? 0 : Math.round(num * 100) / 100;
+        });
 
         this.instances.attHours = new Chart(canvas, {
             type: 'bar',
