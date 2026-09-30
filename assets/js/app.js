@@ -2452,10 +2452,19 @@ const app = createApp({
             try {
                 if (!currentUser.value) return [];
                 const monthKey = currentEvalMonth.value;
+                const emps = employees.value || INITIAL_EMPLOYEES || [];
                 let targetList = [];
+                const myId = String(currentUser.value.id);
 
-                if (currentRole.value === 'admin') {
-                    targetList = (employees.value || INITIAL_EMPLOYEES || []).filter(e => e && String(e.id) !== '1');
+                if (currentRole.value === 'admin' || myId === '1') {
+                    // Admin evaluates managers (employees who are managers, leads, supervisors, heads, or have subordinates)
+                    targetList = emps.filter(e => {
+                        if (!e || String(e.id) === '1') return false;
+                        const r = (e.role || e.designation || '').toLowerCase();
+                        const isMgrRole = r.includes('manager') || r.includes('lead') || r.includes('supervisor') || r.includes('head');
+                        const hasSubs = emps.some(sub => sub && String(sub.managerId) === String(e.id));
+                        return isMgrRole || hasSubs;
+                    });
                 } else if (isUserManager.value) {
                     targetList = userSubordinates.value || [];
                 } else {
@@ -2464,7 +2473,7 @@ const app = createApp({
 
                 const ratings = performanceRatings.value || [];
                 return targetList.filter(e => {
-                    return e && !ratings.some(r => r && String(r.empId) === String(e.id) && r.month === monthKey && String(r.raterId) === String(currentUser.value.id));
+                    return e && !ratings.some(r => r && String(r.empId) === String(e.id) && r.month === monthKey && String(r.raterId) === myId);
                 });
             } catch (e) {
                 return [];

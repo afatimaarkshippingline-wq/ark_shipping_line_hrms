@@ -2033,7 +2033,7 @@
                     <h3 class="text-base sm:text-lg font-bold font-heading text-slate-900 dark:text-white flex items-center gap-2">
                         <i class="fa-solid fa-star text-amber-500"></i> Monthly Performance Evaluation ({{ currentEvalMonth }})
                     </h3>
-                    <p class="text-xs text-slate-500 mt-0.5">Rate direct team members out of 5 stars for this month's PER cycle.</p>
+                    <p class="text-xs text-slate-500 mt-0.5">{{ currentRole === 'admin' ? 'Rate departmental managers out of 5 stars for this month\'s PER cycle.' : 'Rate direct team members out of 5 stars for this month\'s PER cycle.' }}</p>
                 </div>
                 <button @click="modals.evalPopup = false" class="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 flex items-center justify-center"><i class="fa-solid fa-xmark text-sm"></i></button>
             </div>
@@ -2183,7 +2183,7 @@
                     <h3 class="text-base sm:text-lg font-bold font-heading text-slate-900 dark:text-white flex items-center gap-2">
                         <i class="fa-solid fa-star text-amber-500"></i> Monthly Performance Evaluation ({{ currentEvalMonth }})
                     </h3>
-                    <p class="text-xs text-slate-500 mt-0.5">Rate direct team members out of 5 stars for this month's PER cycle.</p>
+                    <p class="text-xs text-slate-500 mt-0.5">{{ currentRole === 'admin' ? 'Rate departmental managers out of 5 stars for this month\'s PER cycle.' : 'Rate direct team members out of 5 stars for this month\'s PER cycle.' }}</p>
                 </div>
                 <button @click="modals.evalPopup = false" class="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 flex items-center justify-center"><i class="fa-solid fa-xmark text-sm"></i></button>
             </div>
